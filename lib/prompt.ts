@@ -33,6 +33,11 @@ interface Explanation {
     to: string;             // step id
     label?: string;         // what feeds back and what it changes
   }[];
+  groups?: {                // optional: cluster steps that form one subsystem
+    id: string;
+    label: string;          // e.g. "Retrieval subsystem"
+    steps: string[];        // member step ids
+  }[];
 }
 
 Rules:

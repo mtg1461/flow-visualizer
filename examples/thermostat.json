@@ -53,5 +53,12 @@
       "to": "compare",
       "label": "heat leaking away drags the reading back down"
     }
+  ],
+  "groups": [
+    {
+      "id": "control",
+      "label": "Control loop",
+      "steps": ["compare", "heat", "idle"]
+    }
   ]
 }

@@ -2,9 +2,9 @@ import type { Explanation } from "./types";
 
 /** Tile geometry — node tiles sit centered in grid cells. */
 export const CELL_W = 320;
-export const CELL_H = 200;
+export const CELL_H = 168;
 export const NODE_W = 256;
-export const NODE_H = 140;
+export const NODE_H = 96;
 export const GX = (CELL_W - NODE_W) / 2;
 export const GY = (CELL_H - NODE_H) / 2;
 

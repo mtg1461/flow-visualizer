@@ -1,7 +1,7 @@
 "use client";
 
 import type { Step } from "@/lib/types";
-import { KIND_META } from "@/lib/meta";
+import { KIND_META, withAlpha } from "@/lib/meta";
 import { NODE_H, NODE_W } from "@/lib/graph";
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
   partName?: string;
   partColor?: string;
   onPointerDown: (e: React.PointerEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
   onPortClick: () => void;
 }
 
@@ -29,35 +30,40 @@ export function NodeTile({
   partName,
   partColor,
   onPointerDown,
+  onContextMenu,
   onPortClick,
 }: Props) {
   const kind = KIND_META[step.kind ?? "process"];
+  const accent = step.color ?? kind.color;
 
   return (
     <div
       data-node-id={step.id}
       onPointerDown={onPointerDown}
-      style={{ left: x, top: y, width: NODE_W, height: NODE_H }}
-      className={`group absolute select-none rounded-xl border bg-surface px-3.5 py-3 transition-shadow ${
-        dragging
-          ? "z-20 shadow-2xl shadow-black/60"
-          : "shadow-lg shadow-black/25"
-      } ${
-        selected
-          ? "border-accent/60 ring-2 ring-accent/20"
+      onContextMenu={onContextMenu}
+      title={step.detail}
+      style={{
+        left: x,
+        top: y,
+        width: NODE_W,
+        height: NODE_H,
+        borderColor: selected
+          ? withAlpha(accent, "cc")
           : connectSource
-            ? "border-teal/60 ring-2 ring-teal/20"
-            : "border-line-strong/80 hover:border-line-strong"
-      } ${connectTarget ? "cursor-crosshair hover:border-teal/60 hover:ring-2 hover:ring-teal/20" : "cursor-default"}`}
+            ? "rgba(127,214,194,0.8)"
+            : "rgba(255,255,255,0.16)",
+        boxShadow: `inset 3px 0 0 ${accent}${
+          selected ? `, 0 0 0 3px ${withAlpha(accent, "2e")}` : ""
+        }${dragging ? ", 0 16px 40px rgba(0,0,0,0.6)" : ", 0 4px 16px rgba(0,0,0,0.35)"}`,
+      }}
+      className={`group absolute select-none rounded-lg border bg-tile px-3.5 py-2.5 transition-[border-color,box-shadow] duration-150 hover:border-line-strong ${
+        dragging ? "z-20" : ""
+      } ${connectTarget ? "cursor-crosshair" : "cursor-default"}`}
     >
       <div className="flex items-center gap-1.5">
         <span
-          className="size-1.5 rounded-full"
-          style={{ background: kind.color }}
-        />
-        <span
-          className="text-[9.5px] uppercase tracking-[0.14em]"
-          style={{ color: kind.color }}
+          className="text-[9.5px] font-medium uppercase tracking-[0.15em]"
+          style={{ color: accent }}
         >
           {kind.label}
         </span>
@@ -66,36 +72,16 @@ export function NodeTile({
           <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-mute">
             <span
               className="size-1.5 shrink-0 rounded-full"
-              style={{ background: partColor ?? "#8f8ffc" }}
+              style={{ background: partColor ?? "#9b9bff" }}
             />
             <span className="truncate">{partName}</span>
           </span>
         )}
       </div>
 
-      <h3 className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-snug text-text">
+      <h3 className="mt-1.5 line-clamp-2 text-[13.5px] font-medium leading-snug text-text">
         {step.title}
       </h3>
-      {step.detail && (
-        <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-mute">
-          {step.detail}
-        </p>
-      )}
-
-      {(step.inputs?.length || step.outputs?.length) && (
-        <div className="absolute inset-x-3.5 bottom-2.5 flex gap-2 overflow-hidden text-[9.5px] leading-4">
-          {step.inputs?.length ? (
-            <span className="truncate text-teal/80">
-              in&ensp;{step.inputs.join(" · ")}
-            </span>
-          ) : null}
-          {step.outputs?.length ? (
-            <span className="truncate text-rose/80">
-              out&ensp;{step.outputs.join(" · ")}
-            </span>
-          ) : null}
-        </div>
-      )}
 
       {/* connect port */}
       <button

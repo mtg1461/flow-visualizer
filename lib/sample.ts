@@ -100,4 +100,18 @@ export const SAMPLE: Explanation = {
       label: "user feedback re-ranks passages over time",
     },
   ],
+  groups: [
+    {
+      id: "retrieval",
+      label: "Retrieval",
+      color: "#7fd6c2",
+      steps: ["embed", "retrieve", "judge", "rewrite"],
+    },
+    {
+      id: "generation",
+      label: "Generation",
+      color: "#9b9bff",
+      steps: ["compose", "verify"],
+    },
+  ],
 };

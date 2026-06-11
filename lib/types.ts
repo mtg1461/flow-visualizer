@@ -37,6 +37,17 @@ export interface Step {
   note?: string;
   /** Tile position on the canvas. Managed by the tool — agents omit it. */
   grid?: { col: number; row: number };
+  /** Custom accent color (hex). Overrides the kind color. */
+  color?: string;
+}
+
+export interface Group {
+  id: string;
+  /** Region label, e.g. "Retrieval subsystem". */
+  label: string;
+  color?: string;
+  /** Member step ids. */
+  steps: string[];
 }
 
 export interface Loop {
@@ -54,4 +65,6 @@ export interface Explanation {
   steps: Step[];
   /** System-level feedback loops beyond step-to-step flow. */
   loops?: Loop[];
+  /** Labeled regions clustering related steps. */
+  groups?: Group[];
 }

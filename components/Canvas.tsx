@@ -10,7 +10,8 @@ import {
 } from "react";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import type { Explanation } from "@/lib/types";
-import { partColors } from "@/lib/meta";
+import { partColors, withAlpha } from "@/lib/meta";
+import type { MenuTarget } from "./ContextMenu";
 import {
   CELL_H,
   CELL_W,
@@ -38,6 +39,7 @@ interface Props {
   onStartConnect: (id: string) => void;
   onCompleteConnect: (to: string) => void;
   onCancelConnect: () => void;
+  onMenu: (target: MenuTarget, x: number, y: number) => void;
 }
 
 interface View {
@@ -47,9 +49,9 @@ interface View {
 }
 
 const EDGE_STYLE = {
-  forward: { stroke: "rgba(236,236,243,0.35)", dash: undefined, marker: "soft" },
-  feedback: { stroke: "rgba(224,180,99,0.8)", dash: "5 5", marker: "amber" },
-  loop: { stroke: "rgba(143,143,252,0.7)", dash: "2.5 6", marker: "accent" },
+  forward: { stroke: "rgba(228,230,246,0.5)", dash: undefined, marker: "soft" },
+  feedback: { stroke: "rgba(238,194,122,0.9)", dash: "5 5", marker: "amber" },
+  loop: { stroke: "rgba(155,155,255,0.85)", dash: "2.5 6", marker: "accent" },
 } as const;
 
 export function Canvas({
@@ -63,6 +65,7 @@ export function Canvas({
   onStartConnect,
   onCompleteConnect,
   onCancelConnect,
+  onMenu,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 80, y: 60, k: 1 });
@@ -235,6 +238,60 @@ export function Canvas({
     }
   };
 
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const tile = (e.target as HTMLElement).closest?.("[data-node-id]");
+    if (tile) {
+      onMenu(
+        { type: "tile", id: (tile as HTMLElement).dataset.nodeId! },
+        e.clientX,
+        e.clientY
+      );
+    } else {
+      const w = toWorld(e.clientX, e.clientY);
+      onMenu(
+        {
+          type: "canvas",
+          cell: nearestFreeCell(positions, (w.x - GX) / CELL_W, (w.y - GY) / CELL_H),
+        },
+        e.clientX,
+        e.clientY
+      );
+    }
+  };
+
+  // dashed region rectangles behind the tiles
+  const groupRects = useMemo(() => {
+    return (doc.groups ?? [])
+      .map((g) => {
+        const members = g.steps
+          .map((id) => livePositions.get(id))
+          .filter((p): p is Pos => !!p);
+        if (!members.length) return null;
+        let minC = Infinity,
+          maxC = -Infinity,
+          minR = Infinity,
+          maxR = -Infinity;
+        for (const p of members) {
+          minC = Math.min(minC, p.col);
+          maxC = Math.max(maxC, p.col);
+          minR = Math.min(minR, p.row);
+          maxR = Math.max(maxR, p.row);
+        }
+        const color = g.color ?? "#9b9bff";
+        return {
+          id: g.id,
+          label: g.label,
+          color,
+          left: minC * CELL_W + GX - 18,
+          top: minR * CELL_H + GY - 32,
+          width: (maxC - minC) * CELL_W + NODE_W + 36,
+          height: (maxR - minR) * CELL_H + NODE_H + 50,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+  }, [doc.groups, livePositions]);
+
   // node dragging via window listeners
   const startNodeDrag = (id: string) => (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -301,6 +358,7 @@ export function Canvas({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onContextMenu={onContextMenu}
       className={`relative h-full w-full overflow-hidden ${
         panRef.current?.moved ? "cursor-grabbing" : "cursor-grab"
       } ${connectFrom ? "cursor-crosshair" : ""}`}
@@ -319,10 +377,34 @@ export function Canvas({
           className="absolute -inset-[4000px]"
           style={{
             backgroundImage:
-              "radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1.4px)",
+              "radial-gradient(circle, rgba(255,255,255,0.085) 1px, transparent 1.4px)",
             backgroundSize: "26px 26px",
           }}
         />
+
+        {/* group regions */}
+        {groupRects.map((r) => (
+          <div
+            key={r.id}
+            aria-hidden
+            className="pointer-events-none absolute rounded-2xl border border-dashed"
+            style={{
+              left: r.left,
+              top: r.top,
+              width: r.width,
+              height: r.height,
+              borderColor: withAlpha(r.color, "59"),
+              background: withAlpha(r.color, "0d"),
+            }}
+          >
+            <span
+              className="absolute left-3.5 top-2 text-[10px] font-medium uppercase tracking-[0.18em]"
+              style={{ color: withAlpha(r.color, "d9") }}
+            >
+              {r.label}
+            </span>
+          </div>
+        ))}
 
         {/* drop ghost */}
         {drag && dragCell && (
@@ -348,10 +430,10 @@ export function Canvas({
           <defs>
             {(
               [
-                ["soft", "rgba(236,236,243,0.55)"],
-                ["amber", "rgba(224,180,99,0.95)"],
-                ["accent", "rgba(143,143,252,0.9)"],
-                ["teal", "rgba(108,199,178,0.9)"],
+                ["soft", "rgba(228,230,246,0.75)"],
+                ["amber", "rgba(238,194,122,1)"],
+                ["accent", "rgba(155,155,255,1)"],
+                ["teal", "rgba(127,214,194,1)"],
               ] as const
             ).map(([name, color]) => (
               <marker
@@ -396,12 +478,18 @@ export function Canvas({
                     e.stopPropagation();
                     onSelect({ kind: "edge", ref: edge.ref });
                   }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSelect({ kind: "edge", ref: edge.ref });
+                    onMenu({ type: "edge", ref: edge.ref }, e.clientX, e.clientY);
+                  }}
                 />
                 <path
                   d={edge.d}
                   fill="none"
-                  stroke={isSel ? "rgba(143,143,252,0.95)" : style.stroke}
-                  strokeWidth={isSel ? 2 : 1.3}
+                  stroke={isSel ? "rgba(185,185,255,1)" : style.stroke}
+                  strokeWidth={isSel ? 2.2 : 1.4}
                   strokeDasharray={style.dash}
                   markerEnd={`url(#tip-${isSel ? "accent" : style.marker})`}
                   className="pointer-events-none"
@@ -435,10 +523,10 @@ export function Canvas({
             const isSel = selectedEdgeKey === edge.key;
             const tone =
               edge.kind === "loop"
-                ? "border-accent/25 text-accent/90"
+                ? "border-accent/40 text-accent"
                 : edge.backward
-                  ? "border-amber/25 text-amber/90"
-                  : "border-line-strong text-mute";
+                  ? "border-amber/40 text-amber"
+                  : "border-line-strong text-text/80";
             return (
               <button
                 key={`lbl-${edge.key}`}
@@ -448,8 +536,8 @@ export function Canvas({
                   e.stopPropagation();
                   onSelect({ kind: "edge", ref: edge.ref });
                 }}
-                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-full border bg-bg/95 px-2 py-0.5 text-[10px] leading-4 backdrop-blur-sm ${tone} ${
-                  isSel ? "ring-1 ring-accent/50" : ""
+                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[10.5px] leading-4 shadow-md shadow-black/30 ${tone} ${
+                  isSel ? "ring-1 ring-accent/60" : ""
                 }`}
                 style={{ left: edge.labelX, top: edge.labelY }}
               >
@@ -482,6 +570,11 @@ export function Canvas({
               }
               partColor={step.part ? colors.get(step.part) : undefined}
               onPointerDown={startNodeDrag(step.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onMenu({ type: "tile", id: step.id }, e.clientX, e.clientY);
+              }}
               onPortClick={() =>
                 connectFrom === step.id
                   ? onCancelConnect()
@@ -538,7 +631,7 @@ export function Canvas({
 
       {/* hint */}
       <div className="pointer-events-none absolute bottom-5 left-4 hidden text-[11px] text-faint md:block">
-        drag tiles · click a tile&apos;s ○ to connect · click an edge to edit
+        right-click for actions
       </div>
     </div>
   );

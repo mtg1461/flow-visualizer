@@ -1,8 +1,8 @@
 "use client";
 
 import { CornerDownRight, Link2, Plus, RotateCcw, Trash2 } from "lucide-react";
-import type { Branch, Explanation, Step, StepKind } from "@/lib/types";
-import { KIND_META, partColors } from "@/lib/meta";
+import type { Branch, Explanation, Group, Step, StepKind } from "@/lib/types";
+import { KIND_META, STEP_PALETTE, partColors, withAlpha } from "@/lib/meta";
 import { type EdgeRef, type Selection } from "@/lib/graph";
 
 export interface EditorActions {
@@ -16,6 +16,10 @@ export interface EditorActions {
   updatePart: (id: string, patch: { name?: string; role?: string }) => void;
   deletePart: (id: string) => void;
   addLoop: (from: string, to: string) => void;
+  /** groupId, existing group id, or "__new__"; null removes membership. */
+  assignGroup: (stepId: string, groupId: string | null) => void;
+  updateGroup: (id: string, patch: Partial<Pick<Group, "label" | "color">>) => void;
+  deleteGroup: (id: string) => void;
 }
 
 interface Props {
@@ -114,6 +118,53 @@ function StepPanel({
             {meta.label}
           </option>
         ))}
+      </select>
+
+      <span className={labelCls}>Color</span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          title="Kind default"
+          aria-label="Reset to kind color"
+          onClick={() => actions.updateStep(step.id, { color: undefined })}
+          className={`size-4.5 cursor-pointer rounded-full border border-dashed border-line-strong transition-transform hover:scale-110 ${
+            !step.color ? "ring-1 ring-text/60" : ""
+          }`}
+          style={{ background: withAlpha(KIND_META[step.kind ?? "process"].color, "33") }}
+        />
+        {STEP_PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            title={c}
+            aria-label={`Set color ${c}`}
+            onClick={() => actions.updateStep(step.id, { color: c })}
+            className={`size-4.5 cursor-pointer rounded-full transition-transform hover:scale-110 ${
+              step.color === c
+                ? "ring-1 ring-text/70 ring-offset-2 ring-offset-surface"
+                : ""
+            }`}
+            style={{ background: c }}
+          />
+        ))}
+      </div>
+
+      <label className={labelCls} htmlFor="insp-group">
+        Group
+      </label>
+      <select
+        id="insp-group"
+        className={`${inputCls} cursor-pointer appearance-none`}
+        value={doc.groups?.find((g) => g.steps.includes(step.id))?.id ?? ""}
+        onChange={(e) => actions.assignGroup(step.id, e.target.value || null)}
+      >
+        <option value="">none</option>
+        {(doc.groups ?? []).map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.label}
+          </option>
+        ))}
+        <option value="__new__">+ new group</option>
       </select>
 
       <label className={labelCls} htmlFor="insp-part">
@@ -451,10 +502,54 @@ function DocPanel({
         <AddLoop doc={doc} onAdd={actions.addLoop} />
       </div>
 
-      <p className="mt-6 border-t border-line pt-4 text-[11px] leading-relaxed text-faint">
-        Select a tile or an edge to edit it. Everything you change here is
-        reflected in the JSON.
-      </p>
+      {(doc.groups?.length ?? 0) > 0 && (
+        <>
+          <span className={labelCls}>Groups</span>
+          <div className="space-y-1.5">
+            {(doc.groups ?? []).map((g) => {
+              const color = g.color ?? "#9b9bff";
+              const next =
+                STEP_PALETTE[
+                  (STEP_PALETTE.indexOf(color) + 1) % STEP_PALETTE.length
+                ];
+              return (
+                <div key={g.id} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    title="Change color"
+                    aria-label={`Change color of ${g.label}`}
+                    onClick={() => actions.updateGroup(g.id, { color: next })}
+                    className="size-3.5 shrink-0 cursor-pointer rounded-md border border-dashed transition-transform hover:scale-110"
+                    style={{
+                      borderColor: color,
+                      background: withAlpha(color, "26"),
+                    }}
+                  />
+                  <input
+                    aria-label="Group label"
+                    className="w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[12px] text-text focus:border-line focus:outline-none"
+                    value={g.label}
+                    onChange={(e) =>
+                      actions.updateGroup(g.id, { label: e.target.value })
+                    }
+                  />
+                  <span className="text-[10.5px] text-faint">
+                    {g.steps.length}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Delete group ${g.label}`}
+                    onClick={() => actions.deleteGroup(g.id)}
+                    className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

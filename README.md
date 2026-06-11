@@ -23,10 +23,14 @@ npm run dev   # http://localhost:4400
 - Drag tiles to rearrange (positions persist via the optional `grid` field).
 - Click a tile to edit it in the inspector; click its ○ port, then another
   tile, to connect (decision steps get condition branches, everything else
-  gets its next step).
+  gets its next step). Hover a tile to read its detail.
+- Right-click a tile for quick actions (add after, connect, recolor, delete),
+  the canvas to add a step at that spot, or an edge to delete it.
 - Click an edge or its label to edit the condition / loop description.
-- With nothing selected the inspector edits the summary, moving parts, and
-  system loops. `Delete` removes the selection, `Esc` deselects.
+- Steps can be clustered into dashed group regions (`groups` in the JSON, or
+  the Group select in the inspector); each step can carry a custom color.
+- With nothing selected the inspector edits the summary, moving parts,
+  system loops, and groups. `Delete` removes the selection, `Esc` deselects.
 - Everything autosaves to `localStorage`; **JSON → Copy JSON** exports the
   current state, edits included.
 

@@ -66,6 +66,7 @@ export function parseExplanation(raw: string): ParseResult {
       then: typeof s.then === "string" ? s.then : undefined,
       note: typeof s.note === "string" ? s.note : undefined,
       grid: isGrid(s.grid) ? { col: s.grid.col, row: s.grid.row } : undefined,
+      color: typeof s.color === "string" ? s.color : undefined,
     });
   }
 
@@ -98,6 +99,20 @@ export function parseExplanation(raw: string): ParseResult {
         }))
     : undefined;
 
+  const groups = Array.isArray(obj.groups)
+    ? (obj.groups as Record<string, unknown>[])
+        .filter((g) => typeof g?.label === "string" && Array.isArray(g?.steps))
+        .map((g, i) => ({
+          id: typeof g.id === "string" && g.id ? g.id : `group-${i + 1}`,
+          label: g.label as string,
+          color: typeof g.color === "string" ? g.color : undefined,
+          steps: (g.steps as unknown[])
+            .filter((x): x is string => typeof x === "string")
+            .filter((id) => ids.has(id)),
+        }))
+        .filter((g) => g.steps.length > 0)
+    : undefined;
+
   return {
     ok: true,
     data: {
@@ -106,6 +121,7 @@ export function parseExplanation(raw: string): ParseResult {
       parts,
       steps,
       loops,
+      groups,
     },
   };
 }

@@ -12,6 +12,7 @@ import {
   normalize,
 } from "@/lib/graph";
 import { Canvas } from "./Canvas";
+import { ContextMenu, type MenuState } from "./ContextMenu";
 import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
 import { JsonDialog } from "./JsonDialog";
@@ -29,6 +30,7 @@ export function Editor({ initial, initialCustom }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [menu, setMenu] = useState<MenuState | null>(null);
 
   const setDoc = useCallback((next: Explanation) => {
     setDocState(next);
@@ -79,6 +81,9 @@ export function Editor({ initial, initialCustom }: Props) {
                 .filter((b) => b.to !== id),
             })),
           loops: d.loops?.filter((l) => l.from !== id && l.to !== id),
+          groups: d.groups
+            ?.map((g) => ({ ...g, steps: g.steps.filter((s) => s !== id) }))
+            .filter((g) => g.steps.length > 0),
         };
         setIsCustom(true);
         try {
@@ -91,40 +96,54 @@ export function Editor({ initial, initialCustom }: Props) {
     []
   );
 
-  const addStep = useCallback(() => {
-    let n = doc.steps.length + 1;
-    while (doc.steps.some((s) => s.id === `step-${n}`)) n++;
-    const id = `step-${n}`;
+  const addStep = useCallback(
+    (opts?: { afterId?: string; cell?: Pos }) => {
+      let n = doc.steps.length + 1;
+      while (doc.steps.some((s) => s.id === `step-${n}`)) n++;
+      const id = `step-${n}`;
 
-    const selectedId = selection?.kind === "step" ? selection.id : null;
-    const anchor = selectedId
-      ? positions.get(selectedId)
-      : [...positions.values()].reduce<Pos | null>(
-          (acc, p) => (!acc || p.row > acc.row ? p : acc),
-          null
+      const afterId =
+        opts?.afterId ??
+        (opts?.cell ? null : selection?.kind === "step" ? selection.id : null);
+      let cell: Pos;
+      if (opts?.cell) {
+        cell = nearestFreeCell(positions, opts.cell.col, opts.cell.row);
+      } else {
+        const anchor = afterId
+          ? positions.get(afterId)
+          : [...positions.values()].reduce<Pos | null>(
+              (acc, p) => (!acc || p.row > acc.row ? p : acc),
+              null
+            );
+        cell = nearestFreeCell(
+          positions,
+          anchor?.col ?? 0,
+          (anchor?.row ?? -1) + 1
         );
-    const cell = nearestFreeCell(
-      positions,
-      anchor?.col ?? 0,
-      (anchor?.row ?? -1) + 1
-    );
+      }
 
-    const newStep: Step = { id, title: "New step", kind: "process", grid: cell };
-    let steps: Step[];
-    if (selectedId) {
-      // insert into the flow after the selected step
-      const i = doc.steps.findIndex((s) => s.id === selectedId);
-      const sel = doc.steps[i];
-      const inherited = !sel.branches?.length ? sel.then : undefined;
-      steps = [...doc.steps];
-      steps[i] = inherited ? { ...sel, then: id } : sel;
-      steps.splice(i + 1, 0, inherited ? { ...newStep, then: inherited } : newStep);
-    } else {
-      steps = [...doc.steps, newStep];
-    }
-    setDoc({ ...doc, steps });
-    setSelection({ kind: "step", id });
-  }, [doc, selection, positions, setDoc]);
+      const newStep: Step = { id, title: "New step", kind: "process", grid: cell };
+      let steps: Step[];
+      if (afterId) {
+        // insert into the flow after the anchor step
+        const i = doc.steps.findIndex((s) => s.id === afterId);
+        const sel = doc.steps[i];
+        const inherited = !sel.branches?.length ? sel.then : undefined;
+        steps = [...doc.steps];
+        steps[i] = inherited ? { ...sel, then: id } : sel;
+        steps.splice(
+          i + 1,
+          0,
+          inherited ? { ...newStep, then: inherited } : newStep
+        );
+      } else {
+        steps = [...doc.steps, newStep];
+      }
+      setDoc({ ...doc, steps });
+      setSelection({ kind: "step", id });
+    },
+    [doc, selection, positions, setDoc]
+  );
 
   const moveNode = useCallback(
     (id: string, cell: Pos) => updateStep(id, { grid: cell }),
@@ -231,6 +250,38 @@ export function Editor({ initial, initialCustom }: Props) {
           ...doc,
           loops: [...(doc.loops ?? []), { from, to, label: "feeds back" }],
         }),
+      assignGroup: (stepId, groupId) => {
+        let groups = (doc.groups ?? []).map((g) => ({
+          ...g,
+          steps: g.steps.filter((s) => s !== stepId),
+        }));
+        if (groupId === "__new__") {
+          let n = groups.length + 1;
+          while (groups.some((g) => g.id === `group-${n}`)) n++;
+          groups.push({ id: `group-${n}`, label: `Group ${n}`, steps: [stepId] });
+        } else if (groupId) {
+          groups = groups.map((g) =>
+            g.id === groupId ? { ...g, steps: [...g.steps, stepId] } : g
+          );
+        }
+        setDoc({
+          ...doc,
+          groups: groups.filter((g) => g.steps.length > 0).length
+            ? groups.filter((g) => g.steps.length > 0)
+            : undefined,
+        });
+      },
+      updateGroup: (id, patch) =>
+        setDoc({
+          ...doc,
+          groups: doc.groups?.map((g) =>
+            g.id === id ? { ...g, ...patch } : g
+          ),
+        }),
+      deleteGroup: (id) => {
+        const groups = doc.groups?.filter((g) => g.id !== id);
+        setDoc({ ...doc, groups: groups?.length ? groups : undefined });
+      },
     }),
     [doc, setDoc, updateStep, deleteStep, deleteEdge, updateEdgeLabel]
   );
@@ -271,7 +322,7 @@ export function Editor({ initial, initialCustom }: Props) {
         title={doc.title}
         isCustom={isCustom}
         onTitle={(title) => setDoc({ ...doc, title })}
-        onAddStep={addStep}
+        onAddStep={() => addStep()}
         onOpenJson={() => setJsonOpen(true)}
         onReset={() => {
           setDocState(normalize(SAMPLE));
@@ -295,8 +346,28 @@ export function Editor({ initial, initialCustom }: Props) {
           onStartConnect={setConnectFrom}
           onCompleteConnect={completeConnect}
           onCancelConnect={() => setConnectFrom(null)}
+          onMenu={(target, x, y) => setMenu({ target, x, y })}
         />
         <Inspector doc={doc} selection={selection} actions={actions} />
+        {menu && (
+          <ContextMenu
+            menu={menu}
+            currentColor={
+              menu.target.type === "tile"
+                ? doc.steps.find((s) => s.id === (menu.target as { id: string }).id)
+                    ?.color
+                : undefined
+            }
+            canDelete={doc.steps.length > 1}
+            onClose={() => setMenu(null)}
+            onAddAfter={(id) => addStep({ afterId: id })}
+            onAddAt={(cell) => addStep({ cell })}
+            onConnect={(id) => setConnectFrom(id)}
+            onColor={(id, color) => updateStep(id, { color })}
+            onDeleteStep={deleteStep}
+            onDeleteEdge={deleteEdge}
+          />
+        )}
       </div>
       <JsonDialog
         open={jsonOpen}
