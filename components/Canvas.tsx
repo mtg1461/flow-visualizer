@@ -23,6 +23,7 @@ import {
   type EdgeRef,
   type Pos,
   type Selection,
+  cellInRect,
   edgeKey,
   groupCellRect,
   nearestFreeCell,
@@ -405,9 +406,53 @@ export function Canvas({
     );
   };
 
+  // while a tile drags, preview the membership the drop would produce —
+  // same boundary-crossing rule as Editor.moveNode, so the rect never
+  // stretches toward a tile that is about to leave
+  const previewGroups = useMemo(() => {
+    if (!drag || !dragCell) return doc.groups;
+    const oldCell = positions.get(drag.id);
+    const containing = (c: Pos | undefined) =>
+      c
+        ? (doc.groups ?? []).find((g) => {
+            const r = groupCellRect(g, positions);
+            return r && cellInRect(r, c);
+          })
+        : undefined;
+    const newG = containing(dragCell);
+    const oldG = containing(oldCell);
+    if (newG?.id === oldG?.id) return doc.groups;
+    return (doc.groups ?? []).map((g) => {
+      const isMember = g.steps.includes(drag.id);
+      let steps = g.steps;
+      if (isMember && g.id !== newG?.id)
+        steps = steps.filter((s) => s !== drag.id);
+      else if (!isMember && g.id === newG?.id) steps = [...steps, drag.id];
+      if (steps === g.steps) return g;
+      // a group about to lose its last member keeps its footprint,
+      // exactly as the drop will materialize it
+      if (steps.length === 0 && !g.grid) {
+        const rect = groupCellRect(g, positions);
+        return {
+          ...g,
+          steps,
+          grid: rect
+            ? {
+                col: rect.minC,
+                row: rect.minR,
+                cols: rect.maxC - rect.minC + 1,
+                rows: rect.maxR - rect.minR + 1,
+              }
+            : undefined,
+        };
+      }
+      return { ...g, steps };
+    });
+  }, [drag, dragCell, positions, doc.groups]);
+
   // dashed region rectangles behind the tiles
   const groupRects = useMemo(() => {
-    return (doc.groups ?? [])
+    return (previewGroups ?? [])
       .map((g) => {
         const shifting =
           groupDrag && groupDrag.id === g.id
@@ -465,7 +510,7 @@ export function Canvas({
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [doc.groups, livePositions, groupDrag, groupResize]);
+  }, [previewGroups, livePositions, groupDrag, groupResize]);
 
   // group dragging — moves every member tile by a cell delta
   const groupDragRef = useRef<{
