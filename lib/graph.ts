@@ -1,4 +1,4 @@
-import type { EdgeLine, Explanation } from "./types";
+import type { EdgeLine, Explanation, Group } from "./types";
 
 /** Tile geometry — node tiles sit centered in grid cells. */
 export const CELL_W = 320;
@@ -37,7 +37,51 @@ export type EdgeRef =
 
 export type Selection =
   | { kind: "step"; id: string }
-  | { kind: "edge"; ref: EdgeRef };
+  | { kind: "edge"; ref: EdgeRef }
+  | { kind: "group"; id: string };
+
+export interface CellRect {
+  minC: number;
+  maxC: number;
+  minR: number;
+  maxR: number;
+}
+
+/** A group's footprint in cells: its members' bbox plus any explicit region. */
+export function groupCellRect(
+  g: Group,
+  pos: Map<string, Pos>
+): CellRect | null {
+  let minC = Infinity;
+  let maxC = -Infinity;
+  let minR = Infinity;
+  let maxR = -Infinity;
+  for (const id of g.steps) {
+    const p = pos.get(id);
+    if (!p) continue;
+    minC = Math.min(minC, p.col);
+    maxC = Math.max(maxC, p.col);
+    minR = Math.min(minR, p.row);
+    maxR = Math.max(maxR, p.row);
+  }
+  if (g.grid) {
+    minC = Math.min(minC, g.grid.col);
+    maxC = Math.max(maxC, g.grid.col + g.grid.cols - 1);
+    minR = Math.min(minR, g.grid.row);
+    maxR = Math.max(maxR, g.grid.row + g.grid.rows - 1);
+  }
+  if (!Number.isFinite(minC)) return null;
+  return { minC, maxC, minR, maxR };
+}
+
+export function cellInRect(rect: CellRect, cell: Pos): boolean {
+  return (
+    cell.col >= rect.minC &&
+    cell.col <= rect.maxC &&
+    cell.row >= rect.minR &&
+    cell.row <= rect.maxR
+  );
+}
 
 export function edgeKey(ref: EdgeRef): string {
   if (ref.type === "flow") return `f-${ref.from}`;

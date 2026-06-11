@@ -60,6 +60,12 @@ export function Inspector({ doc, selection, actions }: Props) {
         />
       ) : selection?.kind === "edge" ? (
         <EdgePanel doc={doc} edgeRef={selection.ref} actions={actions} />
+      ) : selection?.kind === "group" ? (
+        <GroupPanel
+          doc={doc}
+          group={doc.groups?.find((g) => g.id === selection.id)}
+          actions={actions}
+        />
       ) : (
         <DocPanel doc={doc} actions={actions} />
       )}
@@ -483,6 +489,100 @@ function EdgePanel({
           Reset styling
         </button>
       )}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- group */
+
+function GroupPanel({
+  doc,
+  group,
+  actions,
+}: {
+  doc: Explanation;
+  group?: Group;
+  actions: EditorActions;
+}) {
+  if (!group) return null;
+  const titleOf = new Map(doc.steps.map((s) => [s.id, s.title]));
+  const color = group.color ?? "#9b9bff";
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
+          Group
+        </span>
+        <button
+          type="button"
+          title="Ungroup (steps stay)"
+          onClick={() => actions.deleteGroup(group.id)}
+          className="cursor-pointer rounded-md p-1.5 text-faint transition-colors hover:bg-rose/10 hover:text-rose"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <label className={labelCls} htmlFor="insp-group-label">
+        Label
+      </label>
+      <input
+        id="insp-group-label"
+        className={inputCls}
+        value={group.label}
+        onChange={(e) => actions.updateGroup(group.id, { label: e.target.value })}
+      />
+
+      <span className={labelCls}>Color</span>
+      <div className="flex items-center gap-1.5">
+        {STEP_PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            title={c}
+            aria-label={`Set group color ${c}`}
+            onClick={() => actions.updateGroup(group.id, { color: c })}
+            className={`size-4.5 cursor-pointer rounded-full transition-transform hover:scale-110 ${
+              color === c
+                ? "ring-1 ring-text/70 ring-offset-2 ring-offset-raise"
+                : ""
+            }`}
+            style={{ background: c }}
+          />
+        ))}
+      </div>
+
+      <span className={labelCls}>
+        Members <span className="normal-case tracking-normal">({group.steps.length})</span>
+      </span>
+      <div className="space-y-1">
+        {group.steps.map((id) => (
+          <div key={id} className="flex items-center gap-1.5 text-[12px]">
+            <span className="w-0 flex-1 truncate text-text/85">
+              {truncate(titleOf.get(id) ?? id, 32)}
+            </span>
+            <button
+              type="button"
+              aria-label={`Remove ${titleOf.get(id) ?? id} from group`}
+              onClick={() => actions.assignGroup(id, null)}
+              className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
+            >
+              <Trash2 size={11} />
+            </button>
+          </div>
+        ))}
+        {group.steps.length === 0 && (
+          <p className="text-[11.5px] leading-relaxed text-faint">
+            Empty — drop tiles inside the region to add them.
+          </p>
+        )}
+      </div>
+
+      <p className="mt-5 border-t border-line pt-3.5 text-[11px] leading-relaxed text-faint">
+        Drag the region to move every member with it. Tiles dropped inside
+        join; dragged out, they leave.
+      </p>
     </div>
   );
 }

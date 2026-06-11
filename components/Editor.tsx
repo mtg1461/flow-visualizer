@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EdgeLine, Explanation, Step } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
 import {
+  GRID_LIMITS,
   type EdgeRef,
   type Pos,
   type Selection,
+  cellInRect,
+  groupCellRect,
   layoutPositions,
   nearestFreeCell,
   normalize,
@@ -45,6 +48,8 @@ function validSelection(
   if (!sel) return null;
   if (sel.kind === "step")
     return doc.steps.some((s) => s.id === sel.id) ? sel : null;
+  if (sel.kind === "group")
+    return doc.groups?.some((g) => g.id === sel.id) ? sel : null;
   const ref = sel.ref;
   if (ref.type === "flow")
     return doc.steps.find((s) => s.id === ref.from)?.then ? sel : null;
@@ -154,7 +159,7 @@ export function Editor({ initial, initialCustom }: Props) {
         loops: d.loops?.filter((l) => l.from !== id && l.to !== id),
         groups: d.groups
           ?.map((g) => ({ ...g, steps: g.steps.filter((s) => s !== id) }))
-          .filter((g) => g.steps.length > 0),
+          .filter((g) => g.steps.length > 0 || g.grid),
       });
       setSelection(null);
     },
@@ -212,8 +217,109 @@ export function Editor({ initial, initialCustom }: Props) {
   );
 
   const moveNode = useCallback(
-    (id: string, cell: Pos) => updateStep(id, { grid: cell }),
-    [updateStep]
+    (id: string, cell: Pos) => {
+      const d = docRef.current;
+      const pos = layoutPositions(d);
+      // membership follows placement: inside a region joins, outside leaves
+      const target = (d.groups ?? []).find((g) => {
+        const rect = groupCellRect(g, pos);
+        return rect && cellInRect(rect, cell);
+      });
+      const current = (d.groups ?? []).find((g) => g.steps.includes(id));
+      let groups = d.groups;
+      if (target?.id !== current?.id) {
+        const next = (d.groups ?? [])
+          .map((g) => {
+            let steps = g.steps.filter((s) => s !== id);
+            if (g.id === target?.id) steps = [...steps, id];
+            return { ...g, steps };
+          })
+          .filter((g) => g.steps.length > 0 || g.grid);
+        groups = next.length ? next : undefined;
+      }
+      commit(
+        {
+          ...d,
+          steps: d.steps.map((s) =>
+            s.id === id ? { ...s, grid: cell } : s
+          ),
+          groups,
+        },
+        `step:${id}:grid`
+      );
+    },
+    [commit]
+  );
+
+  const moveGroup = useCallback(
+    (id: string, dCol: number, dRow: number) => {
+      const d = docRef.current;
+      const g = d.groups?.find((x) => x.id === id);
+      if (!g || (!dCol && !dRow)) return;
+      const pos = layoutPositions(d);
+      const members = new Set(g.steps);
+      for (const sid of g.steps) {
+        const p = pos.get(sid);
+        if (!p) continue;
+        const c = p.col + dCol;
+        const r = p.row + dRow;
+        if (
+          c < GRID_LIMITS.minCol ||
+          c > GRID_LIMITS.maxCol ||
+          r < GRID_LIMITS.minRow ||
+          r > GRID_LIMITS.maxRow
+        )
+          return;
+        for (const [oid, op] of pos)
+          if (!members.has(oid) && op.col === c && op.row === r) return;
+      }
+      commit({
+        ...d,
+        steps: d.steps.map((s) => {
+          if (!members.has(s.id)) return s;
+          const p = pos.get(s.id);
+          if (!p) return s;
+          return { ...s, grid: { col: p.col + dCol, row: p.row + dRow } };
+        }),
+        groups: d.groups?.map((x) =>
+          x.id === id && x.grid
+            ? {
+                ...x,
+                grid: {
+                  ...x.grid,
+                  col: x.grid.col + dCol,
+                  row: x.grid.row + dRow,
+                },
+              }
+            : x
+        ),
+      });
+    },
+    [commit]
+  );
+
+  const addGroupAt = useCallback(
+    (cell: Pos) => {
+      const d = docRef.current;
+      const existing = d.groups ?? [];
+      let n = existing.length + 1;
+      while (existing.some((g) => g.id === `group-${n}`)) n++;
+      const id = `group-${n}`;
+      commit({
+        ...d,
+        groups: [
+          ...existing,
+          {
+            id,
+            label: `Group ${n}`,
+            steps: [],
+            grid: { col: cell.col, row: cell.row, cols: 2, rows: 2 },
+          },
+        ],
+      });
+      setSelection({ kind: "group", id });
+    },
+    [commit]
   );
 
   const completeConnect = useCallback(
@@ -420,7 +526,7 @@ export function Editor({ initial, initialCustom }: Props) {
             g.id === groupId ? { ...g, steps: [...g.steps, stepId] } : g
           );
         }
-        const kept = groups.filter((g) => g.steps.length > 0);
+        const kept = groups.filter((g) => g.steps.length > 0 || g.grid);
         commit({ ...d, groups: kept.length ? kept : undefined });
       },
       updateGroup: (id, patch) => {
@@ -476,12 +582,13 @@ export function Editor({ initial, initialCustom }: Props) {
       ) {
         e.preventDefault();
         if (selection.kind === "step") deleteStep(selection.id);
+        else if (selection.kind === "group") actions.deleteGroup(selection.id);
         else deleteEdge(selection.ref);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [selection, connectFrom, jsonOpen, deleteStep, deleteEdge, undo, redo]);
+  }, [selection, connectFrom, jsonOpen, deleteStep, deleteEdge, undo, redo, actions]);
 
   /* ---------------------------------------------------------- render */
 
@@ -508,6 +615,7 @@ export function Editor({ initial, initialCustom }: Props) {
           onSelect={setSelection}
           onClearSelection={() => setSelection(null)}
           onMoveNode={moveNode}
+          onMoveGroup={moveGroup}
           onStartConnect={setConnectFrom}
           onCompleteConnect={completeConnect}
           onCancelConnect={() => setConnectFrom(null)}
@@ -522,14 +630,21 @@ export function Editor({ initial, initialCustom }: Props) {
                 ? doc.steps.find(
                     (s) => s.id === (menu.target as { id: string }).id
                   )?.color
-                : undefined
+                : menu.target.type === "group"
+                  ? (doc.groups?.find(
+                      (g) => g.id === (menu.target as { id: string }).id
+                    )?.color ?? "#9b9bff")
+                  : undefined
             }
             canDelete={doc.steps.length > 1}
             onClose={() => setMenu(null)}
             onAddAfter={(id) => addStep({ afterId: id })}
             onAddAt={(cell) => addStep({ cell })}
+            onAddGroupAt={addGroupAt}
             onConnect={(id) => setConnectFrom(id)}
             onColor={(id, color) => updateStep(id, { color })}
+            onGroupColor={(id, color) => actions.updateGroup(id, { color })}
+            onUngroup={(id) => actions.deleteGroup(id)}
             onDeleteStep={deleteStep}
             onDeleteEdge={deleteEdge}
           />

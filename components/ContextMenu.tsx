@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Link2, Plus, Trash2 } from "lucide-react";
+import { Group, Link2, Plus, Trash2, Ungroup } from "lucide-react";
 import { STEP_PALETTE } from "@/lib/meta";
 import type { EdgeRef, Pos } from "@/lib/graph";
 
 export type MenuTarget =
   | { type: "tile"; id: string }
   | { type: "canvas"; cell: Pos }
-  | { type: "edge"; ref: EdgeRef };
+  | { type: "edge"; ref: EdgeRef }
+  | { type: "group"; id: string };
 
 export interface MenuState {
   x: number;
@@ -23,8 +24,11 @@ interface Props {
   onClose: () => void;
   onAddAfter: (id: string) => void;
   onAddAt: (cell: Pos) => void;
+  onAddGroupAt: (cell: Pos) => void;
   onConnect: (id: string) => void;
   onColor: (id: string, color?: string) => void;
+  onGroupColor: (id: string, color: string) => void;
+  onUngroup: (id: string) => void;
   onDeleteStep: (id: string) => void;
   onDeleteEdge: (ref: EdgeRef) => void;
 }
@@ -39,8 +43,11 @@ export function ContextMenu({
   onClose,
   onAddAfter,
   onAddAt,
+  onAddGroupAt,
   onConnect,
   onColor,
+  onGroupColor,
+  onUngroup,
   onDeleteStep,
   onDeleteEdge,
 }: Props) {
@@ -146,18 +153,69 @@ export function ContextMenu({
       )}
 
       {target.type === "canvas" && (
-        <button
-          type="button"
-          role="menuitem"
-          className={itemCls}
-          onClick={() => {
-            onAddAt(target.cell);
-            onClose();
-          }}
-        >
-          <Plus size={13} className="text-faint" />
-          Add step here
-        </button>
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemCls}
+            onClick={() => {
+              onAddAt(target.cell);
+              onClose();
+            }}
+          >
+            <Plus size={13} className="text-faint" />
+            Add step here
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemCls}
+            onClick={() => {
+              onAddGroupAt(target.cell);
+              onClose();
+            }}
+          >
+            <Group size={13} className="text-faint" />
+            Add group here
+          </button>
+        </>
+      )}
+
+      {target.type === "group" && (
+        <>
+          <div className="flex items-center gap-1.5 px-3 py-1.5">
+            {STEP_PALETTE.slice(0, 7).map((c) => (
+              <button
+                key={c}
+                type="button"
+                title={c}
+                aria-label={`Group color ${c}`}
+                onClick={() => {
+                  onGroupColor(target.id, c);
+                  onClose();
+                }}
+                className={`size-4 cursor-pointer rounded-full transition-transform hover:scale-110 ${
+                  currentColor === c
+                    ? "ring-1 ring-text/70 ring-offset-1 ring-offset-raise"
+                    : ""
+                }`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className={`${itemCls} hover:bg-rose/10 hover:text-rose`}
+            onClick={() => {
+              onUngroup(target.id);
+              onClose();
+            }}
+          >
+            <Ungroup size={13} />
+            Ungroup
+          </button>
+        </>
       )}
 
       {target.type === "edge" && (

@@ -24,6 +24,7 @@ import {
   type Pos,
   type Selection,
   edgeKey,
+  groupCellRect,
   nearestFreeCell,
   routeEdges,
 } from "@/lib/graph";
@@ -39,6 +40,7 @@ interface Props {
   onSelect: (sel: Selection) => void;
   onClearSelection: () => void;
   onMoveNode: (id: string, cell: Pos) => void;
+  onMoveGroup: (id: string, dCol: number, dRow: number) => void;
   onStartConnect: (id: string) => void;
   onCompleteConnect: (to: string) => void;
   onCancelConnect: () => void;
@@ -74,6 +76,7 @@ export function Canvas({
   onSelect,
   onClearSelection,
   onMoveNode,
+  onMoveGroup,
   onStartConnect,
   onCompleteConnect,
   onCancelConnect,
@@ -84,6 +87,12 @@ export function Canvas({
   const [drag, setDrag] = useState<{ id: string; wx: number; wy: number } | null>(
     null
   );
+  const [groupDrag, setGroupDrag] = useState<{
+    id: string;
+    dCol: number;
+    dRow: number;
+    valid: boolean;
+  } | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const panRef = useRef<{
     px: number;
@@ -129,11 +138,28 @@ export function Canvas({
   }, [drag, positions]);
 
   const livePositions = useMemo(() => {
-    if (!drag || !dragCell) return positions;
-    const m = new Map(positions);
-    m.set(drag.id, dragCell);
-    return m;
-  }, [positions, drag, dragCell]);
+    if (drag && dragCell) {
+      const m = new Map(positions);
+      m.set(drag.id, dragCell);
+      return m;
+    }
+    if (groupDrag && (groupDrag.dCol || groupDrag.dRow)) {
+      const g = doc.groups?.find((x) => x.id === groupDrag.id);
+      if (g) {
+        const m = new Map(positions);
+        for (const id of g.steps) {
+          const p = positions.get(id);
+          if (p)
+            m.set(id, {
+              col: p.col + groupDrag.dCol,
+              row: p.row + groupDrag.dRow,
+            });
+        }
+        return m;
+      }
+    }
+    return positions;
+  }, [positions, drag, dragCell, groupDrag, doc.groups]);
 
   const edges = useMemo(
     () => routeEdges(doc, livePositions),
@@ -280,57 +306,139 @@ export function Canvas({
 
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const tile = (e.target as HTMLElement).closest?.("[data-node-id]");
+    const el = e.target as HTMLElement;
+    const tile = el.closest?.("[data-node-id]");
     if (tile) {
       onMenu(
         { type: "tile", id: (tile as HTMLElement).dataset.nodeId! },
         e.clientX,
         e.clientY
       );
-    } else {
-      const w = toWorld(e.clientX, e.clientY);
+      return;
+    }
+    const group = el.closest?.("[data-group-id]");
+    if (group) {
       onMenu(
-        {
-          type: "canvas",
-          cell: nearestFreeCell(positions, (w.x - GX) / CELL_W, (w.y - GY) / CELL_H),
-        },
+        { type: "group", id: (group as HTMLElement).dataset.groupId! },
         e.clientX,
         e.clientY
       );
+      return;
     }
+    const w = toWorld(e.clientX, e.clientY);
+    onMenu(
+      {
+        type: "canvas",
+        cell: nearestFreeCell(positions, (w.x - GX) / CELL_W, (w.y - GY) / CELL_H),
+      },
+      e.clientX,
+      e.clientY
+    );
   };
 
   // dashed region rectangles behind the tiles
   const groupRects = useMemo(() => {
     return (doc.groups ?? [])
       .map((g) => {
-        const members = g.steps
-          .map((id) => livePositions.get(id))
-          .filter((p): p is Pos => !!p);
-        if (!members.length) return null;
-        let minC = Infinity,
-          maxC = -Infinity,
-          minR = Infinity,
-          maxR = -Infinity;
-        for (const p of members) {
-          minC = Math.min(minC, p.col);
-          maxC = Math.max(maxC, p.col);
-          minR = Math.min(minR, p.row);
-          maxR = Math.max(maxR, p.row);
-        }
-        const color = g.color ?? "#9b9bff";
+        const shifting =
+          groupDrag && groupDrag.id === g.id
+            ? { dc: groupDrag.dCol, dr: groupDrag.dRow }
+            : { dc: 0, dr: 0 };
+        const effective = g.grid
+          ? {
+              ...g,
+              grid: {
+                ...g.grid,
+                col: g.grid.col + shifting.dc,
+                row: g.grid.row + shifting.dr,
+              },
+            }
+          : g;
+        const rect = groupCellRect(effective, livePositions);
+        if (!rect) return null;
         return {
           id: g.id,
           label: g.label,
-          color,
-          left: minC * CELL_W + GX - 18,
-          top: minR * CELL_H + GY - 32,
-          width: (maxC - minC) * CELL_W + NODE_W + 36,
-          height: (maxR - minR) * CELL_H + NODE_H + 50,
+          color: g.color ?? "#9b9bff",
+          invalid: groupDrag?.id === g.id && !groupDrag.valid,
+          left: rect.minC * CELL_W + GX - 18,
+          top: rect.minR * CELL_H + GY - 34,
+          width: (rect.maxC - rect.minC) * CELL_W + NODE_W + 36,
+          height: (rect.maxR - rect.minR) * CELL_H + NODE_H + 52,
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [doc.groups, livePositions]);
+  }, [doc.groups, livePositions, groupDrag]);
+
+  // group dragging — moves every member tile by a cell delta
+  const groupDragRef = useRef<{
+    id: string;
+    sx: number;
+    sy: number;
+    moved: boolean;
+  } | null>(null);
+
+  const startGroupDrag = (id: string) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const w = toWorld(e.clientX, e.clientY);
+    groupDragRef.current = { id, sx: w.x, sy: w.y, moved: false };
+    let last: { dCol: number; dRow: number; valid: boolean } | null = null;
+
+    const move = (ev: PointerEvent) => {
+      const d = groupDragRef.current;
+      if (!d) return;
+      const wp = toWorld(ev.clientX, ev.clientY);
+      if (!d.moved && Math.abs(wp.x - d.sx) + Math.abs(wp.y - d.sy) < 8) return;
+      d.moved = true;
+      const dCol = Math.round((wp.x - d.sx) / CELL_W);
+      const dRow = Math.round((wp.y - d.sy) / CELL_H);
+      const g = doc.groups?.find((x) => x.id === d.id);
+      let valid = true;
+      if (g) {
+        const members = new Set(g.steps);
+        outer: for (const sid of g.steps) {
+          const p = positions.get(sid);
+          if (!p) continue;
+          const c = p.col + dCol;
+          const r = p.row + dRow;
+          if (
+            c < GRID_LIMITS.minCol ||
+            c > GRID_LIMITS.maxCol ||
+            r < GRID_LIMITS.minRow ||
+            r > GRID_LIMITS.maxRow
+          ) {
+            valid = false;
+            break;
+          }
+          for (const [oid, op] of positions) {
+            if (!members.has(oid) && op.col === c && op.row === r) {
+              valid = false;
+              break outer;
+            }
+          }
+        }
+      }
+      last = { dCol, dRow, valid };
+      setGroupDrag({ id: d.id, dCol, dRow, valid });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const d = groupDragRef.current;
+      groupDragRef.current = null;
+      setGroupDrag(null);
+      if (!d) return;
+      if (!d.moved) {
+        if (connectFrom) onCancelConnect();
+        else onSelect({ kind: "group", id: d.id });
+      } else if (last && last.valid && (last.dCol || last.dRow)) {
+        onMoveGroup(d.id, last.dCol, last.dRow);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   // node dragging via window listeners
   const startNodeDrag = (id: string) => (e: React.PointerEvent) => {
@@ -428,29 +536,45 @@ export function Canvas({
           }}
         />
 
-        {/* group regions */}
-        {groupRects.map((r) => (
-          <div
-            key={r.id}
-            aria-hidden
-            className="pointer-events-none absolute rounded-2xl border border-dashed"
-            style={{
-              left: r.left,
-              top: r.top,
-              width: r.width,
-              height: r.height,
-              borderColor: withAlpha(r.color, "73"),
-              background: withAlpha(r.color, "10"),
-            }}
-          >
-            <span
-              className="absolute left-3.5 top-2 text-[10.5px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: r.color }}
+        {/* group regions — interactive: click selects, drag moves members */}
+        {groupRects.map((r) => {
+          const isSel = selection?.kind === "group" && selection.id === r.id;
+          return (
+            <div
+              key={r.id}
+              data-group-id={r.id}
+              onPointerDown={startGroupDrag(r.id)}
+              className="absolute cursor-move rounded-2xl border-[1.5px] border-dashed transition-[box-shadow] duration-150"
+              style={{
+                left: r.left,
+                top: r.top,
+                width: r.width,
+                height: r.height,
+                borderColor: r.invalid
+                  ? "rgba(239,156,190,0.9)"
+                  : isSel
+                    ? r.color
+                    : withAlpha(r.color, "a6"),
+                background: r.invalid
+                  ? "rgba(239,156,190,0.08)"
+                  : withAlpha(r.color, "1c"),
+                boxShadow: isSel
+                  ? `0 0 0 3px ${withAlpha(r.color, "38")}`
+                  : undefined,
+              }}
             >
-              {r.label}
-            </span>
-          </div>
-        ))}
+              <span
+                className="absolute left-2.5 top-2 rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{
+                  color: r.color,
+                  background: withAlpha(r.color, "30"),
+                }}
+              >
+                {r.label}
+              </span>
+            </div>
+          );
+        })}
 
         {/* drop ghost */}
         {drag && dragCell && (

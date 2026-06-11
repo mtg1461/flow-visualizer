@@ -124,8 +124,9 @@ export function parseExplanation(raw: string): ParseResult {
           steps: (g.steps as unknown[])
             .filter((x): x is string => typeof x === "string")
             .filter((id) => ids.has(id)),
+          grid: isGroupGrid(g.grid) ? g.grid : undefined,
         }))
-        .filter((g) => g.steps.length > 0)
+        .filter((g) => g.steps.length > 0 || g.grid)
     : undefined;
 
   return {
@@ -139,6 +140,18 @@ export function parseExplanation(raw: string): ParseResult {
       groups,
     },
   };
+}
+
+function isGroupGrid(
+  v: unknown
+): v is { col: number; row: number; cols: number; rows: number } {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    ["col", "row", "cols", "rows"].every(
+      (k) => typeof (v as Record<string, unknown>)[k] === "number"
+    )
+  );
 }
 
 function isGrid(v: unknown): v is { col: number; row: number } {

@@ -60,6 +60,9 @@ export interface Group {
   color?: string;
   /** Member step ids. */
   steps: string[];
+  /** Explicit region in grid cells — lets a group exist before it has
+   *  members. Tool-managed; agents omit it. */
+  grid?: { col: number; row: number; cols: number; rows: number };
 }
 
 export interface Loop {
