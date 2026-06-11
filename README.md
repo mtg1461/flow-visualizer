@@ -27,4 +27,7 @@ as dashed feedback arcs, and `loops` capture system-level feedback.
 
 ## Stack
 
-Next.js 15 (App Router) · TypeScript · Tailwind v4 · framer-motion · lucide-react
+Next.js 15 (App Router) · TypeScript · Tailwind v4 · lucide-react
+
+Animations are pure CSS (from-only keyframes), so content is never gated on
+JavaScript animation state and `prefers-reduced-motion` is honored for free.
