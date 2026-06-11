@@ -380,9 +380,9 @@ export function Canvas({
             top: -CELL_H * 24,
             width: CELL_W * 90,
             height: CELL_H * 140,
-            opacity: drag ? 1 : 0.45,
+            opacity: drag ? 1 : 0.6,
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
-              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.12)' stroke-dasharray='5 6'/></svg>`
+              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
             )}")`,
             backgroundSize: `${CELL_W}px ${CELL_H}px`,
           }}
