@@ -40,6 +40,24 @@ npm run dev   # http://localhost:4400
 The data shape is `Explanation` in [lib/types.ts](lib/types.ts). Layout,
 edge-building, and orthogonal routing live in [lib/graph.ts](lib/graph.ts).
 
+## Canvas rules
+
+1. **Pinned tiles stay put; unpinned tiles flow.** Auto-layout only
+   positions tiles you haven't placed yourself. Dragging a tile pins it.
+2. **Groups anchor their members.** A tile inside a group never moves
+   unless you move it or its group — reflows caused by edits outside the
+   group can't stretch a region.
+3. **Membership is coverage.** Group-level operations (move, resize,
+   region-move, add-inside) adopt what the box covers and release what it
+   doesn't. Inspector removals stay sticky until the next group operation
+   or a drag across the boundary. Tiles are never poached from another
+   group.
+4. **Previews tell the truth.** What you see mid-drag is exactly what the
+   drop produces.
+5. **Tidy and JSON-apply re-layout.** They are the explicit escape hatches
+   from rules 1–2: Tidy strips every pin (including group anchors), and
+   applying pasted JSON trusts the document's own layout.
+
 ## Stack
 
 Next.js 15 (App Router) · TypeScript · Tailwind v4 · lucide-react

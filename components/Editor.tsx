@@ -40,6 +40,32 @@ function persist(doc: Explanation | null) {
   }
 }
 
+/**
+ * Canvas ruleset, rule 2: groups anchor their members. A tile inside a
+ * group must never move because something OUTSIDE the group changed —
+ * auto-layout positions tiles relative to their predecessors, so without
+ * this, dragging a connected outside tile reflows unpinned members and
+ * stretches the group. Every commit pins unpinned members at the cell
+ * they occupied before the mutation. Tidy and JSON-apply bypass this on
+ * purpose: they are the explicit "re-layout everything" actions.
+ */
+function stabilizeGroupMembers(
+  next: Explanation,
+  prevPos: Map<string, Pos>
+): Explanation {
+  const memberIds = new Set((next.groups ?? []).flatMap((g) => g.steps));
+  if (memberIds.size === 0) return next;
+  let changed = false;
+  const steps = next.steps.map((s) => {
+    if (!memberIds.has(s.id) || s.grid) return s;
+    const p = prevPos.get(s.id);
+    if (!p) return s;
+    changed = true;
+    return { ...s, grid: { col: p.col, row: p.row } };
+  });
+  return changed ? { ...next, steps } : next;
+}
+
 function rectToGrid(rect: {
   minC: number;
   maxC: number;
@@ -91,23 +117,28 @@ export function Editor({ initial, initialCustom }: Props) {
   const future = useRef<Explanation[]>([]);
   const lastCommit = useRef({ key: "", at: 0 });
 
-  const commit = useCallback((next: Explanation, coalesceKey?: string) => {
-    const now = Date.now();
-    const merge =
-      !!coalesceKey &&
-      coalesceKey === lastCommit.current.key &&
-      now - lastCommit.current.at < COALESCE_MS;
-    if (!merge) {
-      past.current.push(docRef.current);
-      if (past.current.length > HISTORY_LIMIT) past.current.shift();
-    }
-    lastCommit.current = { key: coalesceKey ?? "", at: now };
-    future.current = [];
-    setCanUndo(true);
-    setDocState(next);
-    setIsCustom(true);
-    persist(next);
-  }, []);
+  const commit = useCallback(
+    (next: Explanation, coalesceKey?: string, stabilize = true) => {
+      if (stabilize)
+        next = stabilizeGroupMembers(next, layoutPositions(docRef.current));
+      const now = Date.now();
+      const merge =
+        !!coalesceKey &&
+        coalesceKey === lastCommit.current.key &&
+        now - lastCommit.current.at < COALESCE_MS;
+      if (!merge) {
+        past.current.push(docRef.current);
+        if (past.current.length > HISTORY_LIMIT) past.current.shift();
+      }
+      lastCommit.current = { key: coalesceKey ?? "", at: now };
+      future.current = [];
+      setCanUndo(true);
+      setDocState(next);
+      setIsCustom(true);
+      persist(next);
+    },
+    []
+  );
 
   const undo = useCallback(() => {
     const prev = past.current.pop();
@@ -572,14 +603,19 @@ export function Editor({ initial, initialCustom }: Props) {
   const tidy = useCallback(() => {
     const d = docRef.current;
     if (d.steps.some((s) => s.grid)) {
-      commit({
-        ...d,
-        steps: d.steps.map((s) => {
-          if (!s.grid) return s;
-          const { grid: _dropped, ...rest } = s;
-          return rest;
-        }),
-      });
+      // rule 5: Tidy is the explicit re-layout — skip member stabilization
+      commit(
+        {
+          ...d,
+          steps: d.steps.map((s) => {
+            if (!s.grid) return s;
+            const { grid: _dropped, ...rest } = s;
+            return rest;
+          }),
+        },
+        undefined,
+        false
+      );
     }
     setFitSignal((s) => s + 1);
   }, [commit]);
@@ -795,7 +831,8 @@ export function Editor({ initial, initialCustom }: Props) {
         doc={doc}
         onClose={() => setJsonOpen(false)}
         onApply={(data) => {
-          commit(normalize(data));
+          // imported docs keep their own layout semantics — no stabilization
+          commit(normalize(data), undefined, false);
           setSelection(null);
           setConnectFrom(null);
           setJsonOpen(false);
