@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { Check, CircleAlert, Copy, X } from "lucide-react";
 import type { Explanation } from "@/lib/types";
 import { parseExplanation } from "@/lib/parse";
@@ -57,11 +56,9 @@ export function ImportDialog({ open, onClose, onImport }: Props) {
   if (!open) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-5"
+    <div
+      className="anim-appear fixed inset-0 z-50 flex items-center justify-center p-5"
+      style={{ animationDuration: "0.18s" }}
       role="dialog"
       aria-modal="true"
       aria-label="Paste an explanation"
@@ -72,12 +69,7 @@ export function ImportDialog({ open, onClose, onImport }: Props) {
             onClick={onClose}
             className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
           />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="relative w-full max-w-[620px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl"
-          >
+          <div className="anim-pop relative w-full max-w-[620px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="font-serif text-[22px] italic">
@@ -147,7 +139,7 @@ export function ImportDialog({ open, onClose, onImport }: Props) {
                 Visualize
               </button>
             </div>
-          </motion.div>
-    </motion.div>
+          </div>
+    </div>
   );
 }

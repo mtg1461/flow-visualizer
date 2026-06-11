@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import type { Explanation } from "@/lib/types";
 import { flowStats } from "@/lib/meta";
@@ -32,29 +31,20 @@ export function Hero({ data, isCustom, onOpen }: Props) {
           sample — paste your own
         </button>
       )}
-      <motion.h1
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: "easeOut" }}
-        className="font-serif text-[38px] italic leading-[1.08] tracking-[-0.01em] text-text md:text-[54px]"
-      >
+      <h1 className="anim-rise font-serif text-[38px] italic leading-[1.08] tracking-[-0.01em] text-text md:text-[54px]">
         {data.title}
-      </motion.h1>
+      </h1>
       {data.summary && (
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.12, ease: "easeOut" }}
-          className="mx-auto mt-5 max-w-[58ch] text-[14.5px] leading-relaxed text-mute md:text-[15.5px]"
+        <p
+          style={{ animationDelay: "0.12s" }}
+          className="anim-rise mx-auto mt-5 max-w-[58ch] text-[14.5px] leading-relaxed text-mute md:text-[15.5px]"
         >
           {data.summary}
-        </motion.p>
+        </p>
       )}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.7, delay: 0.25 }}
-        className="mt-9 flex flex-wrap justify-center gap-2"
+      <div
+        style={{ animationDelay: "0.25s" }}
+        className="anim-rise mt-9 flex flex-wrap justify-center gap-2"
       >
         {chips
           .filter(([n]) => n > 0)
@@ -69,7 +59,7 @@ export function Hero({ data, isCustom, onOpen }: Props) {
               {label}
             </span>
           ))}
-      </motion.div>
+      </div>
     </section>
   );
 }

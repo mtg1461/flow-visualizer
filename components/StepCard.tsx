@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import {
   ArrowDownToDot,
   ArrowUpFromDot,
@@ -74,13 +73,10 @@ export function StepCard({
     (byId.get(to)?.index ?? Infinity) < index;
 
   return (
-    <motion.div
+    <div
       ref={refCb}
-      initial={{ opacity: 0, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px 0px" }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      className={`relative rounded-2xl border bg-surface/80 px-5 py-4 backdrop-blur-sm transition-shadow duration-500 md:px-6 md:py-5 ${
+      style={{ animationDelay: `${0.15 + Math.min(index * 0.08, 0.7)}s` }}
+      className={`anim-rise relative rounded-2xl border bg-surface/80 px-5 py-4 backdrop-blur-sm transition-shadow duration-500 md:px-6 md:py-5 ${
         active ? "border-line-strong" : "border-line"
       } ${flash ? "ring-2 ring-accent/40" : ""}`}
     >
@@ -194,6 +190,6 @@ export function StepCard({
       {step.note && (
         <p className="mt-2.5 text-[12px] italic text-faint">{step.note}</p>
       )}
-    </motion.div>
+    </div>
   );
 }

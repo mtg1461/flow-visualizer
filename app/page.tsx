@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MotionConfig } from "framer-motion";
 import type { Explanation } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
 import { parseExplanation } from "@/lib/parse";
@@ -56,7 +55,7 @@ export default function Home() {
   }, []);
 
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <Header
         isCustom={isCustom}
         onOpen={() => setDialogOpen(true)}
@@ -84,6 +83,6 @@ export default function Home() {
         onClose={() => setDialogOpen(false)}
         onImport={handleImport}
       />
-    </MotionConfig>
+    </>
   );
 }

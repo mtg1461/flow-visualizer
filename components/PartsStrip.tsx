@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import type { Explanation } from "@/lib/types";
 import { partColors } from "@/lib/meta";
 
@@ -15,13 +14,10 @@ export function PartsStrip({ data }: { data: Explanation }) {
       </h2>
       <div className="mt-5 flex flex-wrap justify-center gap-2.5">
         {data.parts.map((part, i) => (
-          <motion.div
+          <div
             key={part.id}
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: i * 0.05, ease: "easeOut" }}
-            className="flex items-center gap-2.5 rounded-full border border-line bg-surface py-2 pl-3.5 pr-4"
+            style={{ animationDelay: `${0.2 + i * 0.05}s` }}
+            className="anim-rise flex items-center gap-2.5 rounded-full border border-line bg-surface py-2 pl-3.5 pr-4"
           >
             <span
               className="size-2 rounded-full"
@@ -36,7 +32,7 @@ export function PartsStrip({ data }: { data: Explanation }) {
             {part.role && (
               <span className="text-[12px] text-faint">{part.role}</span>
             )}
-          </motion.div>
+          </div>
         ))}
       </div>
     </section>

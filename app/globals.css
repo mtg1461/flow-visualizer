@@ -24,6 +24,60 @@
   }
 }
 
+/* From-only keyframes: the end state is the element's natural style, so a
+   skipped or disabled animation can never leave content hidden. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+}
+
+@keyframes draw-line {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+.anim-rise {
+  animation: rise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.anim-appear {
+  animation: appear 0.9s ease-out both;
+}
+
+.anim-pop {
+  animation: pop 0.22s ease-out both;
+}
+
+.anim-draw {
+  stroke-dasharray: 1;
+  animation: draw-line 1.4s ease-in-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-appear,
+  .anim-pop,
+  .anim-draw {
+    animation: none;
+  }
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);

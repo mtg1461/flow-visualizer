@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import type { Explanation } from "@/lib/types";
 import { partColors } from "@/lib/meta";
 import { StepCard } from "./StepCard";
@@ -37,6 +36,18 @@ interface Geom {
 
 const useIsoLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
 
 const ARC_STYLE = {
   branch: { stroke: "rgba(236,236,243,0.30)", dash: undefined, marker: "soft" },
@@ -304,16 +315,14 @@ export function Flow({ data }: { data: Explanation }) {
               ))}
             </defs>
 
-            {/* spine */}
-            <motion.path
-              key="spine"
+            {/* spine — pathLength={1} normalizes so the CSS draw works at any size */}
+            <path
+              className="anim-draw"
               d={geom.spinePath}
+              pathLength={1}
               fill="none"
               stroke="rgba(255,255,255,0.13)"
               strokeWidth="1.5"
-              initial={reduced ? false : { pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 1.4, ease: "easeInOut" }}
             />
             <circle
               cx={geom.spineX}
@@ -335,18 +344,16 @@ export function Flow({ data }: { data: Explanation }) {
               {geom.arcs.map((arc) => {
                 const style = ARC_STYLE[arc.kind];
                 return (
-                  <motion.path
+                  <path
                     key={arc.key}
+                    className="anim-appear"
+                    style={{ animationDelay: "0.9s" }}
                     d={arc.d}
                     fill="none"
                     stroke={style.stroke}
                     strokeWidth="1.2"
                     strokeDasharray={style.dash}
                     markerEnd={`url(#arrow-${style.marker})`}
-                    initial={reduced ? false : { opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    viewport={{ once: true, margin: "-40px 0px" }}
-                    transition={{ duration: 0.9, ease: "easeOut" }}
                   />
                 );
               })}
