@@ -9,11 +9,17 @@ export interface Part {
   role?: string;
 }
 
+export type EdgeLine = "solid" | "dashed" | "dotted";
+
 export interface Branch {
   /** Condition in plain language, e.g. "evidence is strong". */
   when: string;
   /** Step id this condition leads to. */
   to: string;
+  /** Custom edge color (hex). Tool-managed. */
+  color?: string;
+  /** Custom line style. Tool-managed. */
+  line?: EdgeLine;
 }
 
 export interface Step {
@@ -33,6 +39,12 @@ export interface Step {
   branches?: Branch[];
   /** Explicit next step when flow does not continue to the following step. */
   then?: string;
+  /** Optional label on the outgoing flow edge. Tool-managed. */
+  thenLabel?: string;
+  /** Custom color for the outgoing flow edge. Tool-managed. */
+  thenColor?: string;
+  /** Custom line style for the outgoing flow edge. Tool-managed. */
+  thenLine?: EdgeLine;
   /** Optional caveat or aside. */
   note?: string;
   /** Tile position on the canvas. Managed by the tool — agents omit it. */
@@ -55,6 +67,10 @@ export interface Loop {
   to: string;
   /** What feeds back, e.g. "click data tunes ranking over time". */
   label?: string;
+  /** Custom edge color (hex). Tool-managed. */
+  color?: string;
+  /** Custom line style. Tool-managed. */
+  line?: EdgeLine;
 }
 
 export interface Explanation {

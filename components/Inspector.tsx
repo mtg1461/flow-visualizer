@@ -1,7 +1,14 @@
 "use client";
 
 import { CornerDownRight, Link2, Plus, RotateCcw, Trash2 } from "lucide-react";
-import type { Branch, Explanation, Group, Step, StepKind } from "@/lib/types";
+import type {
+  Branch,
+  EdgeLine,
+  Explanation,
+  Group,
+  Step,
+  StepKind,
+} from "@/lib/types";
 import { KIND_META, STEP_PALETTE, partColors, withAlpha } from "@/lib/meta";
 import { type EdgeRef, type Selection } from "@/lib/graph";
 
@@ -12,10 +19,13 @@ export interface EditorActions {
   startConnect: (id: string) => void;
   deleteEdge: (ref: EdgeRef) => void;
   updateEdgeLabel: (ref: EdgeRef, label: string) => void;
+  updateEdgeStyle: (
+    ref: EdgeRef,
+    patch: { color?: string | null; line?: EdgeLine | null }
+  ) => void;
   addPart: (name: string) => void;
   updatePart: (id: string, patch: { name?: string; role?: string }) => void;
   deletePart: (id: string) => void;
-  addLoop: (from: string, to: string) => void;
   /** groupId, existing group id, or "__new__"; null removes membership. */
   assignGroup: (stepId: string, groupId: string | null) => void;
   updateGroup: (id: string, patch: Partial<Pick<Group, "label" | "color">>) => void;
@@ -325,6 +335,12 @@ function StepPanel({
 
 /* ---------------------------------------------------------------- edge */
 
+const LINE_OPTIONS: { value: EdgeLine; label: string }[] = [
+  { value: "solid", label: "Solid" },
+  { value: "dashed", label: "Dashed" },
+  { value: "dotted", label: "Dotted" },
+];
+
 function EdgePanel({
   doc,
   edgeRef,
@@ -334,30 +350,44 @@ function EdgePanel({
   edgeRef: EdgeRef;
   actions: EditorActions;
 }) {
-  const byId = new Map(doc.steps.map((s) => [s.id, s.title]));
+  const byId = new Map(doc.steps.map((s, i) => [s.id, { i, title: s.title }]));
   let from = "";
   let to = "";
   let label: string | undefined;
-  let kindLabel = "Sequence";
+  let color: string | undefined;
+  let line: EdgeLine | undefined;
+  let kindLabel = "Connection";
 
   if (edgeRef.type === "flow") {
     const s = doc.steps.find((x) => x.id === edgeRef.from);
     from = edgeRef.from;
     to = s?.then ?? "";
+    label = s?.thenLabel;
+    color = s?.thenColor;
+    line = s?.thenLine;
   } else if (edgeRef.type === "branch") {
     const s = doc.steps.find((x) => x.id === edgeRef.from);
     const b = s?.branches?.[edgeRef.index];
     from = edgeRef.from;
     to = b?.to ?? "";
     label = b?.when;
+    color = b?.color;
+    line = b?.line;
     kindLabel = "Branch";
   } else {
     const l = doc.loops?.[edgeRef.index];
     from = l?.from ?? "";
     to = l?.to ?? "";
     label = l?.label;
-    kindLabel = "System loop";
+    color = l?.color;
+    line = l?.line;
   }
+
+  // the style the edge falls back to when nothing custom is set
+  const backward =
+    edgeRef.type === "loop" ||
+    (byId.get(to)?.i ?? Infinity) <= (byId.get(from)?.i ?? 0);
+  const effectiveLine: EdgeLine = line ?? (backward ? "dashed" : "solid");
 
   return (
     <div>
@@ -376,32 +406,82 @@ function EdgePanel({
       </div>
 
       <p className="mt-3 text-[12.5px] leading-relaxed text-mute">
-        <span className="text-text">{truncate(byId.get(from) ?? from, 30)}</span>
+        <span className="text-text">
+          {truncate(byId.get(from)?.title ?? from, 30)}
+        </span>
         <span className="px-1.5 text-faint">→</span>
-        <span className="text-text">{truncate(byId.get(to) ?? to, 30)}</span>
+        <span className="text-text">
+          {truncate(byId.get(to)?.title ?? to, 30)}
+        </span>
       </p>
 
-      {edgeRef.type !== "flow" && (
-        <>
-          <label className={labelCls} htmlFor="insp-edge-label">
-            {edgeRef.type === "branch" ? "Condition" : "What feeds back"}
-          </label>
-          <input
-            id="insp-edge-label"
-            className={inputCls}
-            value={label ?? ""}
-            placeholder={
-              edgeRef.type === "branch" ? "when…" : "what changes over time…"
-            }
-            onChange={(e) => actions.updateEdgeLabel(edgeRef, e.target.value)}
-          />
-        </>
-      )}
+      <label className={labelCls} htmlFor="insp-edge-label">
+        {edgeRef.type === "branch" ? "Condition" : "Label"}
+      </label>
+      <input
+        id="insp-edge-label"
+        className={inputCls}
+        value={label ?? ""}
+        placeholder={edgeRef.type === "branch" ? "when…" : "optional label…"}
+        onChange={(e) => actions.updateEdgeLabel(edgeRef, e.target.value)}
+      />
 
-      {edgeRef.type === "flow" && (
-        <p className="mt-3 text-[11.5px] leading-relaxed text-faint">
-          The default path the flow takes from this step.
-        </p>
+      <span className={labelCls}>Line</span>
+      <div className="flex gap-1">
+        {LINE_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => actions.updateEdgeStyle(edgeRef, { line: o.value })}
+            className={`flex-1 cursor-pointer rounded-lg border px-2 py-1.5 text-[11.5px] transition-colors ${
+              effectiveLine === o.value
+                ? "border-accent/60 bg-accent/15 text-accent"
+                : "border-line bg-well text-mute hover:border-line-strong hover:text-text"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      <span className={labelCls}>Color</span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          title="Default color"
+          aria-label="Reset to default color"
+          onClick={() => actions.updateEdgeStyle(edgeRef, { color: null })}
+          className={`size-4.5 cursor-pointer rounded-full border border-dashed border-line-strong transition-transform hover:scale-110 ${
+            !color ? "ring-1 ring-text/60" : ""
+          }`}
+        />
+        {STEP_PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            title={c}
+            aria-label={`Set edge color ${c}`}
+            onClick={() => actions.updateEdgeStyle(edgeRef, { color: c })}
+            className={`size-4.5 cursor-pointer rounded-full transition-transform hover:scale-110 ${
+              color === c
+                ? "ring-1 ring-text/70 ring-offset-2 ring-offset-raise"
+                : ""
+            }`}
+            style={{ background: c }}
+          />
+        ))}
+      </div>
+
+      {(line || color) && (
+        <button
+          type="button"
+          onClick={() =>
+            actions.updateEdgeStyle(edgeRef, { line: null, color: null })
+          }
+          className="mt-4 cursor-pointer text-[11.5px] text-faint underline-offset-2 transition-colors hover:text-mute hover:underline"
+        >
+          Reset styling
+        </button>
       )}
     </div>
   );
@@ -417,7 +497,6 @@ function DocPanel({
   actions: EditorActions;
 }) {
   const colors = partColors(doc);
-  const stepsById = new Map(doc.steps.map((s) => [s.id, s.title]));
 
   return (
     <div>
@@ -486,28 +565,6 @@ function DocPanel({
         </button>
       </div>
 
-      <span className={labelCls}>System loops</span>
-      <div className="space-y-1.5">
-        {(doc.loops ?? []).map((l, li) => (
-          <div key={li} className="flex items-center gap-1.5 text-[12px]">
-            <RotateCcw size={11} className="shrink-0 text-accent" />
-            <span className="w-0 flex-1 truncate text-text/85">
-              {truncate(stepsById.get(l.from) ?? l.from, 14)} →{" "}
-              {truncate(stepsById.get(l.to) ?? l.to, 14)}
-            </span>
-            <button
-              type="button"
-              aria-label="Delete loop"
-              onClick={() => actions.deleteEdge({ type: "loop", index: li })}
-              className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
-            >
-              <Trash2 size={11} />
-            </button>
-          </div>
-        ))}
-        <AddLoop doc={doc} onAdd={actions.addLoop} />
-      </div>
-
       {(doc.groups?.length ?? 0) > 0 && (
         <>
           <span className={labelCls}>Groups</span>
@@ -560,57 +617,3 @@ function DocPanel({
   );
 }
 
-function AddLoop({
-  doc,
-  onAdd,
-}: {
-  doc: Explanation;
-  onAdd: (from: string, to: string) => void;
-}) {
-  if (doc.steps.length < 2) return null;
-  return (
-    <form
-      className="flex items-center gap-1.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const fd = new FormData(e.currentTarget);
-        const from = String(fd.get("from"));
-        const to = String(fd.get("to"));
-        if (from && to && from !== to) onAdd(from, to);
-      }}
-    >
-      <select
-        name="from"
-        aria-label="Loop from"
-        className="w-0 flex-1 cursor-pointer appearance-none rounded-lg border border-line bg-well px-1.5 py-1 text-[11.5px] text-text focus:border-accent/40 focus:outline-none"
-        defaultValue={doc.steps[doc.steps.length - 1].id}
-      >
-        {doc.steps.map((s) => (
-          <option key={s.id} value={s.id}>
-            {truncate(s.title, 22)}
-          </option>
-        ))}
-      </select>
-      <span className="text-[10px] text-faint">→</span>
-      <select
-        name="to"
-        aria-label="Loop to"
-        className="w-0 flex-1 cursor-pointer appearance-none rounded-lg border border-line bg-well px-1.5 py-1 text-[11.5px] text-text focus:border-accent/40 focus:outline-none"
-        defaultValue={doc.steps[0].id}
-      >
-        {doc.steps.map((s) => (
-          <option key={s.id} value={s.id}>
-            {truncate(s.title, 22)}
-          </option>
-        ))}
-      </select>
-      <button
-        type="submit"
-        aria-label="Add loop"
-        className="cursor-pointer rounded-md border border-line p-1.5 text-mute transition-colors hover:border-accent/40 hover:text-accent"
-      >
-        <Plus size={11} />
-      </button>
-    </form>
-  );
-}

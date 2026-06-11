@@ -1,4 +1,4 @@
-import type { Explanation } from "./types";
+import type { EdgeLine, Explanation } from "./types";
 
 /** Tile geometry — node tiles sit centered in grid cells. */
 export const CELL_W = 320;
@@ -37,6 +37,10 @@ export interface EdgeDesc {
   /** Points to an earlier step in narrative order — rendered as feedback. */
   backward: boolean;
   kind: "flow" | "branch" | "loop";
+  /** Custom color override. */
+  color?: string;
+  /** Custom line-style override. */
+  line?: EdgeLine;
 }
 
 export interface RoutedEdge extends EdgeDesc {
@@ -62,7 +66,15 @@ export function normalize(doc: Explanation): Explanation {
 export function denormalize(doc: Explanation): Explanation {
   const steps = doc.steps.map((s, i) => {
     const next = doc.steps[i + 1];
-    if (s.then && next && s.then === next.id && !s.branches?.length) {
+    if (
+      s.then &&
+      next &&
+      s.then === next.id &&
+      !s.branches?.length &&
+      !s.thenLabel &&
+      !s.thenColor &&
+      !s.thenLine
+    ) {
       const { then: _omitted, ...rest } = s;
       return rest;
     }
@@ -85,6 +97,8 @@ export function buildEdges(doc: Explanation): EdgeDesc[] {
         label: b.when,
         backward: idx.get(b.to)! <= idx.get(s.id)!,
         kind: "branch",
+        color: b.color,
+        line: b.line,
       });
     });
     if (s.then && idx.has(s.then)) {
@@ -93,8 +107,11 @@ export function buildEdges(doc: Explanation): EdgeDesc[] {
         key: `f-${s.id}`,
         from: s.id,
         to: s.then,
+        label: s.thenLabel,
         backward: idx.get(s.then)! <= idx.get(s.id)!,
         kind: "flow",
+        color: s.thenColor,
+        line: s.thenLine,
       });
     }
   }
@@ -108,6 +125,8 @@ export function buildEdges(doc: Explanation): EdgeDesc[] {
       label: l.label,
       backward: true,
       kind: "loop",
+      color: l.color,
+      line: l.line,
     });
   });
   return out;

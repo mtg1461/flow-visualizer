@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Explanation, Step } from "@/lib/types";
+import type { EdgeLine, Explanation, Step } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
 import {
   type EdgeRef,
@@ -165,12 +165,22 @@ export function Editor({ initial, initialCustom }: Props) {
           kind: "edge",
           ref: { type: "branch", from, index: branches.length - 1 },
         });
-      } else {
+      } else if (!src.then) {
         updateStep(from, { then: to });
         setSelection({ kind: "edge", ref: { type: "flow", from } });
+      } else if (src.then === to) {
+        setSelection({ kind: "edge", ref: { type: "flow", from } });
+      } else {
+        // the flow edge exists — additional connections become loop entries
+        const loops = [...(doc.loops ?? []), { from, to }];
+        setDoc({ ...doc, loops });
+        setSelection({
+          kind: "edge",
+          ref: { type: "loop", index: loops.length - 1 },
+        });
       }
     },
-    [connectFrom, doc, updateStep]
+    [connectFrom, doc, updateStep, setDoc]
   );
 
   const deleteEdge = useCallback(
@@ -209,6 +219,40 @@ export function Editor({ initial, initialCustom }: Props) {
             i === ref.index ? { ...l, label: label || undefined } : l
           ),
         });
+      } else {
+        updateStep(ref.from, { thenLabel: label || undefined });
+      }
+    },
+    [doc, updateStep, setDoc]
+  );
+
+  const updateEdgeStyle = useCallback(
+    (ref: EdgeRef, patch: { color?: string | null; line?: EdgeLine | null }) => {
+      const color =
+        patch.color === undefined ? undefined : (patch.color ?? undefined);
+      const line =
+        patch.line === undefined ? undefined : (patch.line ?? undefined);
+      const apply = <T extends { color?: string; line?: EdgeLine }>(o: T): T => ({
+        ...o,
+        ...("color" in patch ? { color } : {}),
+        ...("line" in patch ? { line } : {}),
+      });
+      if (ref.type === "branch") {
+        const src = doc.steps.find((s) => s.id === ref.from);
+        const branches = (src?.branches ?? []).map((b, i) =>
+          i === ref.index ? apply(b) : b
+        );
+        updateStep(ref.from, { branches });
+      } else if (ref.type === "loop") {
+        setDoc({
+          ...doc,
+          loops: doc.loops?.map((l, i) => (i === ref.index ? apply(l) : l)),
+        });
+      } else {
+        updateStep(ref.from, {
+          ...("color" in patch ? { thenColor: color } : {}),
+          ...("line" in patch ? { thenLine: line } : {}),
+        });
       }
     },
     [doc, updateStep, setDoc]
@@ -222,6 +266,7 @@ export function Editor({ initial, initialCustom }: Props) {
       startConnect: (id) => setConnectFrom(id),
       deleteEdge,
       updateEdgeLabel,
+      updateEdgeStyle,
       addPart: (name) => {
         let base = name
           .toLowerCase()
@@ -244,11 +289,6 @@ export function Editor({ initial, initialCustom }: Props) {
           steps: doc.steps.map((s) =>
             s.part === id ? { ...s, part: undefined } : s
           ),
-        }),
-      addLoop: (from, to) =>
-        setDoc({
-          ...doc,
-          loops: [...(doc.loops ?? []), { from, to, label: "feeds back" }],
         }),
       assignGroup: (stepId, groupId) => {
         let groups = (doc.groups ?? []).map((g) => ({
@@ -283,7 +323,7 @@ export function Editor({ initial, initialCustom }: Props) {
         setDoc({ ...doc, groups: groups?.length ? groups : undefined });
       },
     }),
-    [doc, setDoc, updateStep, deleteStep, deleteEdge, updateEdgeLabel]
+    [doc, setDoc, updateStep, deleteStep, deleteEdge, updateEdgeLabel, updateEdgeStyle]
   );
 
   /* -------------------------------------------------------- keyboard */

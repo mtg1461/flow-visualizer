@@ -22,15 +22,18 @@ npm run dev   # http://localhost:4400
   **Apply**. Try [examples/thermostat.json](examples/thermostat.json).
 - Drag tiles to rearrange (positions persist via the optional `grid` field).
 - Click a tile to edit it in the inspector; click its ○ port, then another
-  tile, to connect (decision steps get condition branches, everything else
-  gets its next step). Hover a tile to read its detail.
+  tile, to connect. Decision steps grow condition branches; other steps get
+  their next step, and further connections from the same tile become extra
+  edges. Hover a tile to read its detail.
 - Right-click a tile for quick actions (add after, connect, recolor, delete),
   the canvas to add a step at that spot, or an edge to delete it.
-- Click an edge or its label to edit the condition / loop description.
+- Click any edge or its label to edit it fully: label, line style
+  (solid/dashed/dotted), and color — defaults follow semantics (feedback is
+  dashed amber) but every edge can be styled freely.
 - Steps can be clustered into dashed group regions (`groups` in the JSON, or
   the Group select in the inspector); each step can carry a custom color.
-- With nothing selected the inspector edits the summary, moving parts,
-  system loops, and groups. `Delete` removes the selection, `Esc` deselects.
+- With nothing selected the inspector edits the summary, moving parts, and
+  groups. `Delete` removes the selection, `Esc` deselects.
 - Everything autosaves to `localStorage`; **JSON → Copy JSON** exports the
   current state, edits included.
 

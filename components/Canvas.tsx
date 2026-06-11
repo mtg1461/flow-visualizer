@@ -54,6 +54,14 @@ const EDGE_STYLE = {
   loop: { stroke: "rgba(165,165,255,1)", dash: "2.5 6", marker: "accent" },
 } as const;
 
+const LINE_DASH = {
+  solid: undefined,
+  dashed: "5 5",
+  dotted: "1.5 5",
+} as const;
+
+const markerId = (color: string) => `tip-c-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
+
 export function Canvas({
   doc,
   positions,
@@ -126,6 +134,11 @@ export function Canvas({
   const edges = useMemo(
     () => routeEdges(doc, livePositions),
     [doc, livePositions]
+  );
+
+  const customColors = useMemo(
+    () => [...new Set(edges.map((e) => e.color).filter((c): c is string => !!c))],
+    [edges]
   );
 
   const fit = useCallback(() => {
@@ -461,14 +474,39 @@ export function Canvas({
                 />
               </marker>
             ))}
+            {customColors.map((color) => (
+              <marker
+                key={color}
+                id={markerId(color)}
+                viewBox="0 0 8 8"
+                refX="6"
+                refY="4"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto-start-reverse"
+              >
+                <path
+                  d="M 0.8 0.8 L 6.4 4 L 0.8 7.2"
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </marker>
+            ))}
           </defs>
           {edges.map((edge) => {
-            const style =
+            const base =
               edge.kind === "loop"
                 ? EDGE_STYLE.loop
                 : edge.backward
                   ? EDGE_STYLE.feedback
                   : EDGE_STYLE.forward;
+            const style = {
+              stroke: edge.color ?? base.stroke,
+              dash: edge.line ? LINE_DASH[edge.line] : base.dash,
+              marker: edge.color ? markerId(edge.color) : `tip-${base.marker}`,
+            };
             const isSel = selectedEdgeKey === edge.key;
             return (
               <g key={edge.key}>
@@ -494,11 +532,16 @@ export function Canvas({
                 <path
                   d={edge.d}
                   fill="none"
-                  stroke={isSel ? "rgba(185,185,255,1)" : style.stroke}
-                  strokeWidth={isSel ? 2.2 : 1.4}
+                  stroke={style.stroke}
+                  strokeWidth={isSel ? 2.4 : 1.4}
                   strokeDasharray={style.dash}
-                  markerEnd={`url(#tip-${isSel ? "accent" : style.marker})`}
+                  markerEnd={`url(#${style.marker})`}
                   className="pointer-events-none"
+                  style={
+                    isSel
+                      ? { filter: "drop-shadow(0 0 4px rgba(255,255,255,0.45))" }
+                      : undefined
+                  }
                 />
               </g>
             );
@@ -527,8 +570,9 @@ export function Canvas({
           .filter((e) => e.label)
           .map((edge) => {
             const isSel = selectedEdgeKey === edge.key;
-            const tone =
-              edge.kind === "loop"
+            const tone = edge.color
+              ? ""
+              : edge.kind === "loop"
                 ? "border-accent/50 text-accent"
                 : edge.backward
                   ? "border-amber/50 text-amber"
@@ -545,7 +589,16 @@ export function Canvas({
                 className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[11px] leading-4 shadow-md shadow-black/40 ${tone} ${
                   isSel ? "ring-1 ring-accent/60" : ""
                 }`}
-                style={{ left: edge.labelX, top: edge.labelY }}
+                style={{
+                  left: edge.labelX,
+                  top: edge.labelY,
+                  ...(edge.color
+                    ? {
+                        color: edge.color,
+                        borderColor: withAlpha(edge.color, "80"),
+                      }
+                    : {}),
+                }}
               >
                 {edge.label}
               </button>

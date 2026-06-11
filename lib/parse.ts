@@ -1,6 +1,11 @@
-import type { Explanation, Step, StepKind } from "./types";
+import type { EdgeLine, Explanation, Step, StepKind } from "./types";
 
 const KINDS: StepKind[] = ["input", "process", "decision", "output", "wait"];
+const LINES: EdgeLine[] = ["solid", "dashed", "dotted"];
+
+function asLine(v: unknown): EdgeLine | undefined {
+  return LINES.includes(v as EdgeLine) ? (v as EdgeLine) : undefined;
+}
 
 export type ParseResult =
   | { ok: true; data: Explanation }
@@ -56,14 +61,22 @@ export function parseExplanation(raw: string): ParseResult {
       branches: Array.isArray(s.branches)
         ? s.branches
             .filter(
-              (b): b is { when: string; to: string } =>
+              (b): b is Record<string, unknown> & { when: string; to: string } =>
                 typeof b === "object" && b !== null &&
                 typeof (b as Record<string, unknown>).when === "string" &&
                 typeof (b as Record<string, unknown>).to === "string"
             )
-            .map((b) => ({ when: b.when, to: b.to }))
+            .map((b) => ({
+              when: b.when,
+              to: b.to,
+              color: typeof b.color === "string" ? b.color : undefined,
+              line: asLine(b.line),
+            }))
         : undefined,
       then: typeof s.then === "string" ? s.then : undefined,
+      thenLabel: typeof s.thenLabel === "string" ? s.thenLabel : undefined,
+      thenColor: typeof s.thenColor === "string" ? s.thenColor : undefined,
+      thenLine: asLine(s.thenLine),
       note: typeof s.note === "string" ? s.note : undefined,
       grid: isGrid(s.grid) ? { col: s.grid.col, row: s.grid.row } : undefined,
       color: typeof s.color === "string" ? s.color : undefined,
@@ -85,6 +98,8 @@ export function parseExplanation(raw: string): ParseResult {
           from: l.from as string,
           to: l.to as string,
           label: typeof l.label === "string" ? l.label : undefined,
+          color: typeof l.color === "string" ? l.color : undefined,
+          line: asLine(l.line),
         }))
         .filter((l) => ids.has(l.from) && ids.has(l.to))
     : undefined;
