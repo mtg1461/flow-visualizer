@@ -1,0 +1,57 @@
+{
+  "title": "How a thermostat holds a temperature",
+  "summary": "A sensor, a comparison, and a switch — repeated forever. The room itself closes the loop: heat changes the very reading that decides whether to heat.",
+  "parts": [
+    { "id": "sensor", "name": "Sensor", "role": "reads the room" },
+    { "id": "ctrl", "name": "Controller", "role": "compares and decides" },
+    { "id": "heater", "name": "Heater", "role": "adds heat" },
+    { "id": "room", "name": "Room", "role": "stores and leaks heat" }
+  ],
+  "steps": [
+    {
+      "id": "read",
+      "title": "The room is measured",
+      "detail": "The sensor samples the air every few seconds. Everything downstream trusts this single number.",
+      "kind": "input",
+      "part": "sensor",
+      "outputs": ["current temperature"]
+    },
+    {
+      "id": "compare",
+      "title": "Is the room too cold?",
+      "detail": "The controller subtracts the reading from the target. A small dead band around the target stops the heater from flapping on and off.",
+      "kind": "decision",
+      "part": "ctrl",
+      "inputs": ["current temperature", "target temperature"],
+      "branches": [
+        { "when": "below target minus the dead band", "to": "heat" },
+        { "when": "inside or above the dead band", "to": "idle" }
+      ]
+    },
+    {
+      "id": "heat",
+      "title": "The heater switches on",
+      "detail": "Heat flows into the room, which slowly raises the next sensor reading — the action changes the input that triggered it.",
+      "kind": "process",
+      "part": "heater",
+      "outputs": ["warmer air"],
+      "then": "read"
+    },
+    {
+      "id": "idle",
+      "title": "Everything rests",
+      "detail": "The heater stays off while the room slowly leaks heat to the outside, drifting the reading back down until the cycle repeats.",
+      "kind": "wait",
+      "part": "room",
+      "then": "read",
+      "note": "The leak is why the loop never ends — comfort is maintenance, not a destination."
+    }
+  ],
+  "loops": [
+    {
+      "from": "idle",
+      "to": "compare",
+      "label": "heat leaking away drags the reading back down"
+    }
+  ]
+}
