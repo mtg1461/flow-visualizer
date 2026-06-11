@@ -40,6 +40,20 @@ function persist(doc: Explanation | null) {
   }
 }
 
+function rectToGrid(rect: {
+  minC: number;
+  maxC: number;
+  minR: number;
+  maxR: number;
+}) {
+  return {
+    col: rect.minC,
+    row: rect.minR,
+    cols: rect.maxC - rect.minC + 1,
+    rows: rect.maxR - rect.minR + 1,
+  };
+}
+
 /** Drops a selection that points at something the restored doc lacks. */
 function validSelection(
   doc: Explanation,
@@ -220,18 +234,37 @@ export function Editor({ initial, initialCustom }: Props) {
     (id: string, cell: Pos) => {
       const d = docRef.current;
       const pos = layoutPositions(d);
-      // membership follows placement: inside a region joins, outside leaves
-      const target = (d.groups ?? []).find((g) => {
-        const rect = groupCellRect(g, pos);
-        return rect && cellInRect(rect, cell);
-      });
-      const current = (d.groups ?? []).find((g) => g.steps.includes(id));
+      const oldCell = pos.get(id);
+      const containing = (c: Pos | undefined) =>
+        c
+          ? (d.groups ?? []).find((g) => {
+              const rect = groupCellRect(g, pos);
+              return rect && cellInRect(rect, c);
+            })
+          : undefined;
+      // membership changes only when the drag CROSSES a region boundary,
+      // so manual assignments made in the inspector stick
+      const newG = containing(cell);
+      const oldG = containing(oldCell);
       let groups = d.groups;
-      if (target?.id !== current?.id) {
+      if (newG?.id !== oldG?.id) {
         const next = (d.groups ?? [])
           .map((g) => {
-            let steps = g.steps.filter((s) => s !== id);
-            if (g.id === target?.id) steps = [...steps, id];
+            const isMember = g.steps.includes(id);
+            let steps = g.steps;
+            if (isMember && g.id !== newG?.id)
+              steps = steps.filter((s) => s !== id);
+            else if (!isMember && g.id === newG?.id) steps = [...steps, id];
+            if (steps === g.steps) return g;
+            // a group losing its last member keeps its footprint as a region
+            if (steps.length === 0 && !g.grid) {
+              const rect = groupCellRect(g, pos);
+              return {
+                ...g,
+                steps,
+                grid: rect ? rectToGrid(rect) : undefined,
+              };
+            }
             return { ...g, steps };
           })
           .filter((g) => g.steps.length > 0 || g.grid);
@@ -252,11 +285,48 @@ export function Editor({ initial, initialCustom }: Props) {
   );
 
   const moveGroup = useCallback(
-    (id: string, dCol: number, dRow: number) => {
+    (id: string, dCol: number, dRow: number, mode: "all" | "region") => {
       const d = docRef.current;
       const g = d.groups?.find((x) => x.id === id);
       if (!g || (!dCol && !dRow)) return;
       const pos = layoutPositions(d);
+
+      if (mode === "region") {
+        // move only the box; membership re-derives from the new footprint
+        const rect = groupCellRect(g, pos);
+        if (!rect) return;
+        const base = g.grid ?? rectToGrid(rect);
+        const ng = { ...base, col: base.col + dCol, row: base.row + dRow };
+        if (
+          ng.col < GRID_LIMITS.minCol ||
+          ng.col + ng.cols - 1 > GRID_LIMITS.maxCol ||
+          ng.row < GRID_LIMITS.minRow ||
+          ng.row + ng.rows - 1 > GRID_LIMITS.maxRow
+        )
+          return;
+        const inside = (p: Pos) =>
+          p.col >= ng.col &&
+          p.col <= ng.col + ng.cols - 1 &&
+          p.row >= ng.row &&
+          p.row <= ng.row + ng.rows - 1;
+        commit({
+          ...d,
+          groups: d.groups?.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  grid: ng,
+                  steps: x.steps.filter((sid) => {
+                    const p = pos.get(sid);
+                    return p && inside(p);
+                  }),
+                }
+              : x
+          ),
+        });
+        return;
+      }
+
       const members = new Set(g.steps);
       for (const sid of g.steps) {
         const p = pos.get(sid);
@@ -513,10 +583,17 @@ export function Editor({ initial, initialCustom }: Props) {
       },
       assignGroup: (stepId, groupId) => {
         const d = docRef.current;
-        let groups = (d.groups ?? []).map((g) => ({
-          ...g,
-          steps: g.steps.filter((s) => s !== stepId),
-        }));
+        const pos = layoutPositions(d);
+        let groups = (d.groups ?? []).map((g) => {
+          if (!g.steps.includes(stepId)) return g;
+          const steps = g.steps.filter((s) => s !== stepId);
+          // keep the region when the last member is removed by hand
+          if (steps.length === 0 && !g.grid && g.id !== groupId) {
+            const rect = groupCellRect(g, pos);
+            return { ...g, steps, grid: rect ? rectToGrid(rect) : undefined };
+          }
+          return { ...g, steps };
+        });
         if (groupId === "__new__") {
           let n = groups.length + 1;
           while (groups.some((g) => g.id === `group-${n}`)) n++;

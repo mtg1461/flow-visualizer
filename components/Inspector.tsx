@@ -583,8 +583,9 @@ function GroupPanel({
       </div>
 
       <p className="mt-5 border-t border-line pt-3.5 text-[11px] leading-relaxed text-faint">
-        Drag the region to move every member with it. Drag the corner handle
-        to resize. Tiles dropped inside join; dragged out, they leave.
+        Drag the region to move it with its members — Alt-drag to move the
+        box alone. Drag the corner handle to resize. Tiles dragged across the
+        boundary join or leave; assignments made here always stick.
       </p>
     </div>
   );

@@ -40,7 +40,12 @@ interface Props {
   onSelect: (sel: Selection) => void;
   onClearSelection: () => void;
   onMoveNode: (id: string, cell: Pos) => void;
-  onMoveGroup: (id: string, dCol: number, dRow: number) => void;
+  onMoveGroup: (
+    id: string,
+    dCol: number,
+    dRow: number,
+    mode: "all" | "region"
+  ) => void;
   onResizeGroup: (
     id: string,
     grid: { col: number; row: number; cols: number; rows: number }
@@ -97,6 +102,8 @@ export function Canvas({
     dCol: number;
     dRow: number;
     valid: boolean;
+    mode: "all" | "region";
+    base: { col: number; row: number; cols: number; rows: number } | null;
   } | null>(null);
   const [groupResize, setGroupResize] = useState<{
     id: string;
@@ -155,7 +162,11 @@ export function Canvas({
       m.set(drag.id, dragCell);
       return m;
     }
-    if (groupDrag && (groupDrag.dCol || groupDrag.dRow)) {
+    if (
+      groupDrag &&
+      groupDrag.mode === "all" &&
+      (groupDrag.dCol || groupDrag.dRow)
+    ) {
       const g = doc.groups?.find((x) => x.id === groupDrag.id);
       if (g) {
         const m = new Map(positions);
@@ -412,6 +423,23 @@ export function Canvas({
               },
             }
           : g;
+        if (
+          groupDrag &&
+          groupDrag.id === g.id &&
+          groupDrag.mode === "region" &&
+          groupDrag.base
+        ) {
+          // region-only drag previews the box alone — members stay put
+          effective = {
+            ...g,
+            steps: [],
+            grid: {
+              ...groupDrag.base,
+              col: groupDrag.base.col + shifting.dc,
+              row: groupDrag.base.row + shifting.dr,
+            },
+          };
+        }
         if (groupResize && groupResize.id === g.id) {
           effective = {
             ...effective,
@@ -450,6 +478,19 @@ export function Canvas({
   const startGroupDrag = (id: string) => (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    const mode: "all" | "region" = e.altKey ? "region" : "all";
+    const g0 = doc.groups?.find((x) => x.id === id);
+    const rect0 = g0 ? groupCellRect(g0, positions) : null;
+    const base =
+      g0?.grid ??
+      (rect0
+        ? {
+            col: rect0.minC,
+            row: rect0.minR,
+            cols: rect0.maxC - rect0.minC + 1,
+            rows: rect0.maxR - rect0.minR + 1,
+          }
+        : null);
     const w = toWorld(e.clientX, e.clientY);
     groupDragRef.current = { id, sx: w.x, sy: w.y, moved: false };
     let last: { dCol: number; dRow: number; valid: boolean } | null = null;
@@ -464,7 +505,14 @@ export function Canvas({
       const dRow = Math.round((wp.y - d.sy) / CELL_H);
       const g = doc.groups?.find((x) => x.id === d.id);
       let valid = true;
-      if (g) {
+      if (mode === "region") {
+        valid =
+          !!base &&
+          base.col + dCol >= GRID_LIMITS.minCol &&
+          base.col + base.cols - 1 + dCol <= GRID_LIMITS.maxCol &&
+          base.row + dRow >= GRID_LIMITS.minRow &&
+          base.row + base.rows - 1 + dRow <= GRID_LIMITS.maxRow;
+      } else if (g) {
         const members = new Set(g.steps);
         outer: for (const sid of g.steps) {
           const p = positions.get(sid);
@@ -489,7 +537,7 @@ export function Canvas({
         }
       }
       last = { dCol, dRow, valid };
-      setGroupDrag({ id: d.id, dCol, dRow, valid });
+      setGroupDrag({ id: d.id, dCol, dRow, valid, mode, base });
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -502,7 +550,7 @@ export function Canvas({
         if (connectFrom) onCancelConnect();
         else onSelect({ kind: "group", id: d.id });
       } else if (last && last.valid && (last.dCol || last.dRow)) {
-        onMoveGroup(d.id, last.dCol, last.dRow);
+        onMoveGroup(d.id, last.dCol, last.dRow, mode);
       }
     };
     window.addEventListener("pointermove", move);
@@ -614,7 +662,7 @@ export function Canvas({
               data-group-id={r.id}
               onPointerDown={startGroupDrag(r.id)}
               className="absolute cursor-move rounded-2xl border-[1.5px] border-dashed transition-[box-shadow] duration-150"
-              title="Drag to move the group · right-click for actions"
+              title="Drag to move group + tiles · Alt-drag to move the region only · right-click for actions"
               style={{
                 left: r.left,
                 top: r.top,
