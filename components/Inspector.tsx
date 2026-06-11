@@ -28,7 +28,10 @@ export interface EditorActions {
   deletePart: (id: string) => void;
   /** groupId, existing group id, or "__new__"; null removes membership. */
   assignGroup: (stepId: string, groupId: string | null) => void;
-  updateGroup: (id: string, patch: Partial<Pick<Group, "label" | "color">>) => void;
+  updateGroup: (
+    id: string,
+    patch: Partial<Pick<Group, "label" | "color" | "grid">>
+  ) => void;
   deleteGroup: (id: string) => void;
 }
 
@@ -580,8 +583,8 @@ function GroupPanel({
       </div>
 
       <p className="mt-5 border-t border-line pt-3.5 text-[11px] leading-relaxed text-faint">
-        Drag the region to move every member with it. Tiles dropped inside
-        join; dragged out, they leave.
+        Drag the region to move every member with it. Drag the corner handle
+        to resize. Tiles dropped inside join; dragged out, they leave.
       </p>
     </div>
   );

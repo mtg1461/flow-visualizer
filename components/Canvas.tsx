@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Maximize2, Minus, Plus } from "lucide-react";
+import { GripVertical, Maximize2, Minus, Plus } from "lucide-react";
 import type { Explanation } from "@/lib/types";
 import { partColors, withAlpha } from "@/lib/meta";
 import type { MenuTarget } from "./ContextMenu";
@@ -41,6 +41,10 @@ interface Props {
   onClearSelection: () => void;
   onMoveNode: (id: string, cell: Pos) => void;
   onMoveGroup: (id: string, dCol: number, dRow: number) => void;
+  onResizeGroup: (
+    id: string,
+    grid: { col: number; row: number; cols: number; rows: number }
+  ) => void;
   onStartConnect: (id: string) => void;
   onCompleteConnect: (to: string) => void;
   onCancelConnect: () => void;
@@ -77,6 +81,7 @@ export function Canvas({
   onClearSelection,
   onMoveNode,
   onMoveGroup,
+  onResizeGroup,
   onStartConnect,
   onCompleteConnect,
   onCancelConnect,
@@ -92,6 +97,13 @@ export function Canvas({
     dCol: number;
     dRow: number;
     valid: boolean;
+  } | null>(null);
+  const [groupResize, setGroupResize] = useState<{
+    id: string;
+    col: number;
+    row: number;
+    cols: number;
+    rows: number;
   } | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const panRef = useRef<{
@@ -304,6 +316,52 @@ export function Canvas({
     }
   };
 
+  // corner handle resizes the group's explicit region
+  const startGroupResize = (id: string) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const g = doc.groups?.find((x) => x.id === id);
+    if (!g) return;
+    const rect = groupCellRect(g, positions);
+    if (!rect) return;
+    // resizing a members-only group materializes its region first
+    const base = g.grid ?? {
+      col: rect.minC,
+      row: rect.minR,
+      cols: rect.maxC - rect.minC + 1,
+      rows: rect.maxR - rect.minR + 1,
+    };
+    const w0 = toWorld(e.clientX, e.clientY);
+    let last: { cols: number; rows: number } | null = null;
+
+    const move = (ev: PointerEvent) => {
+      const wp = toWorld(ev.clientX, ev.clientY);
+      const cols = Math.min(
+        GRID_LIMITS.maxCol - base.col + 1,
+        Math.max(1, base.cols + Math.round((wp.x - w0.x) / CELL_W))
+      );
+      const rows = Math.min(
+        GRID_LIMITS.maxRow - base.row + 1,
+        Math.max(1, base.rows + Math.round((wp.y - w0.y) / CELL_H))
+      );
+      last = { cols, rows };
+      setGroupResize({ id, col: base.col, row: base.row, cols, rows });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setGroupResize(null);
+      if (
+        last &&
+        (last.cols !== base.cols || last.rows !== base.rows || !g.grid)
+      ) {
+        onResizeGroup(id, { col: base.col, row: base.row, ...last });
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const el = e.target as HTMLElement;
@@ -344,7 +402,7 @@ export function Canvas({
           groupDrag && groupDrag.id === g.id
             ? { dc: groupDrag.dCol, dr: groupDrag.dRow }
             : { dc: 0, dr: 0 };
-        const effective = g.grid
+        let effective = g.grid
           ? {
               ...g,
               grid: {
@@ -354,6 +412,17 @@ export function Canvas({
               },
             }
           : g;
+        if (groupResize && groupResize.id === g.id) {
+          effective = {
+            ...effective,
+            grid: {
+              col: groupResize.col,
+              row: groupResize.row,
+              cols: groupResize.cols,
+              rows: groupResize.rows,
+            },
+          };
+        }
         const rect = groupCellRect(effective, livePositions);
         if (!rect) return null;
         return {
@@ -368,7 +437,7 @@ export function Canvas({
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [doc.groups, livePositions, groupDrag]);
+  }, [doc.groups, livePositions, groupDrag, groupResize]);
 
   // group dragging — moves every member tile by a cell delta
   const groupDragRef = useRef<{
@@ -545,6 +614,7 @@ export function Canvas({
               data-group-id={r.id}
               onPointerDown={startGroupDrag(r.id)}
               className="absolute cursor-move rounded-2xl border-[1.5px] border-dashed transition-[box-shadow] duration-150"
+              title="Drag to move the group · right-click for actions"
               style={{
                 left: r.left,
                 top: r.top,
@@ -554,23 +624,35 @@ export function Canvas({
                   ? "rgba(239,156,190,0.9)"
                   : isSel
                     ? r.color
-                    : withAlpha(r.color, "a6"),
+                    : withAlpha(r.color, "bf"),
                 background: r.invalid
-                  ? "rgba(239,156,190,0.08)"
-                  : withAlpha(r.color, "1c"),
+                  ? "rgba(239,156,190,0.12)"
+                  : withAlpha(r.color, "2e"),
                 boxShadow: isSel
-                  ? `0 0 0 3px ${withAlpha(r.color, "38")}`
+                  ? `0 0 0 3px ${withAlpha(r.color, "47")}`
                   : undefined,
               }}
             >
               <span
-                className="absolute left-2.5 top-2 rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                className="absolute left-2.5 top-2 flex items-center gap-1 rounded-md py-0.5 pl-1 pr-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
                 style={{
                   color: r.color,
-                  background: withAlpha(r.color, "30"),
+                  background: withAlpha(r.color, "47"),
                 }}
               >
+                <GripVertical size={11} strokeWidth={2.5} />
                 {r.label}
+              </span>
+              {/* resize handle */}
+              <span
+                title="Drag to resize"
+                onPointerDown={startGroupResize(r.id)}
+                className="absolute -bottom-1 -right-1 flex size-6 cursor-nwse-resize items-end justify-end p-1"
+              >
+                <span
+                  className="block size-3 rounded-br-md border-b-[2.5px] border-r-[2.5px]"
+                  style={{ borderColor: r.color }}
+                />
               </span>
             </div>
           );

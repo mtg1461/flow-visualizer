@@ -616,6 +616,7 @@ export function Editor({ initial, initialCustom }: Props) {
           onClearSelection={() => setSelection(null)}
           onMoveNode={moveNode}
           onMoveGroup={moveGroup}
+          onResizeGroup={(id, grid) => actions.updateGroup(id, { grid })}
           onStartConnect={setConnectFrom}
           onCompleteConnect={completeConnect}
           onCancelConnect={() => setConnectFrom(null)}
