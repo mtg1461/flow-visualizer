@@ -372,6 +372,22 @@ export function routeEdges(
     for (let r = r1; r <= r2; r++) if (occupied.has(`${c},${r}`)) return false;
     return true;
   };
+  /** True when a horizontal run at this row's centre would cross a tile. */
+  const hBlocked = (
+    row: number,
+    x1: number,
+    x2: number,
+    ...exclude: string[]
+  ) => {
+    const lo = Math.min(x1, x2);
+    const hi = Math.max(x1, x2);
+    for (const [sid, p] of pos) {
+      if (p.row !== row || exclude.includes(sid)) continue;
+      const left = p.col * CELL_W + GX;
+      if (left + NODE_W > lo && left < hi) return true;
+    }
+    return false;
+  };
 
   const edges = buildEdges(doc).filter((e) => pos.has(e.from) && pos.has(e.to));
 
@@ -414,19 +430,44 @@ export function routeEdges(
     let lx: number;
     let ly: number;
 
-    if (e.kind === "loop") {
+    if (e.kind === "loop" && A.row === B.row) {
+      // a loop along one row hops the gutter above instead of degenerating
+      // into a straight line through every tile on the row
+      const gy = A.row * CELL_H + 10;
+      pts = [
+        { x: A.x + NODE_W / 2, y: A.y },
+        { x: A.x + NODE_W / 2, y: gy },
+        { x: B.x + NODE_W / 2, y: gy },
+        { x: B.x + NODE_W / 2, y: B.y },
+      ];
+      lx = (A.x + B.x + NODE_W) / 2;
+      ly = gy;
+    } else if (e.kind === "loop") {
       const chan = leftChan.get(e.key) ?? 0;
       const chanX = Math.min(A.x, B.x) - 24 - chan * 14;
       const ay = A.y + NODE_H / 2;
       const by = B.y + NODE_H / 2;
-      pts = [
-        { x: A.x, y: ay },
-        { x: chanX, y: ay },
-        { x: chanX, y: by },
-        { x: B.x, y: by },
-      ];
+      pts = [{ x: A.x, y: ay }];
+      let chanStartY = ay;
+      if (hBlocked(A.row, chanX, A.x, e.from)) {
+        // tiles sit between the source and the channel — jog via gutter
+        const gyA =
+          B.row < A.row ? A.row * CELL_H + 12 : (A.row + 1) * CELL_H - 12;
+        pts.push({ x: A.x - 14, y: ay }, { x: A.x - 14, y: gyA });
+        chanStartY = gyA;
+      }
+      pts.push({ x: chanX, y: chanStartY });
+      let chanEndY = by;
+      const entry: { x: number; y: number }[] = [];
+      if (hBlocked(B.row, chanX, B.x, e.to)) {
+        const gyB =
+          A.row < B.row ? B.row * CELL_H + 12 : (B.row + 1) * CELL_H - 12;
+        chanEndY = gyB;
+        entry.push({ x: B.x - 14, y: gyB }, { x: B.x - 14, y: by });
+      }
+      pts.push({ x: chanX, y: chanEndY }, ...entry, { x: B.x, y: by });
       lx = chanX;
-      ly = (ay + by) / 2;
+      ly = (chanStartY + chanEndY) / 2;
     } else if (B.row < A.row) {
       // target sits above the source — climb a right-side channel and
       // enter through the target's side, never its top
@@ -434,14 +475,30 @@ export function routeEdges(
       const chanX = Math.max(A.x, B.x) + NODE_W + 24 + chan * 14;
       const ay = A.y + NODE_H / 2;
       const by = B.y + NODE_H / 2;
-      pts = [
-        { x: A.x + NODE_W, y: ay },
-        { x: chanX, y: ay },
-        { x: chanX, y: by },
-        { x: B.x + NODE_W, y: by },
-      ];
+      pts = [{ x: A.x + NODE_W, y: ay }];
+      let chanStartY = ay;
+      if (hBlocked(A.row, A.x + NODE_W, chanX, e.from)) {
+        const gyA = A.row * CELL_H + 12; // toward the target, which is above
+        pts.push(
+          { x: A.x + NODE_W + 14, y: ay },
+          { x: A.x + NODE_W + 14, y: gyA }
+        );
+        chanStartY = gyA;
+      }
+      pts.push({ x: chanX, y: chanStartY });
+      let chanEndY = by;
+      const entry: { x: number; y: number }[] = [];
+      if (hBlocked(B.row, chanX, B.x + NODE_W, e.to)) {
+        const gyB = (B.row + 1) * CELL_H - 12; // approaching from below
+        chanEndY = gyB;
+        entry.push(
+          { x: B.x + NODE_W + 14, y: gyB },
+          { x: B.x + NODE_W + 14, y: by }
+        );
+      }
+      pts.push({ x: chanX, y: chanEndY }, ...entry, { x: B.x + NODE_W, y: by });
       lx = chanX;
-      ly = (ay + by) / 2;
+      ly = (chanStartY + chanEndY) / 2;
     } else if (B.row === A.row) {
       if (e.backward) {
         // same-row retry hops over the top gutter
@@ -456,18 +513,31 @@ export function routeEdges(
         ly = gy;
       } else {
         const ay = A.y + NODE_H / 2;
-        pts =
-          B.col > A.col
-            ? [
-                { x: A.x + NODE_W, y: ay },
-                { x: B.x, y: ay },
-              ]
-            : [
-                { x: A.x, y: ay },
-                { x: B.x + NODE_W, y: ay },
-              ];
-        lx = (A.x + B.x + NODE_W) / 2;
-        ly = ay - 14;
+        const ltr = B.col > A.col;
+        const sx = ltr ? A.x + NODE_W : A.x;
+        const ex = ltr ? B.x : B.x + NODE_W;
+        if (!hBlocked(A.row, sx, ex, e.from, e.to)) {
+          pts = [
+            { x: sx, y: ay },
+            { x: ex, y: ay },
+          ];
+          lx = (A.x + B.x + NODE_W) / 2;
+          ly = ay - 14;
+        } else {
+          // tiles in between — duck through the gutter below the row
+          const gy = (A.row + 1) * CELL_H;
+          const off = ltr ? 16 : -16;
+          pts = [
+            { x: sx, y: ay },
+            { x: sx + off, y: ay },
+            { x: sx + off, y: gy },
+            { x: ex - off, y: gy },
+            { x: ex - off, y: ay },
+            { x: ex, y: ay },
+          ];
+          lx = (A.x + B.x + NODE_W) / 2;
+          ly = gy;
+        }
       }
     } else {
       const gIdx = gutterCount.get(A.row) ?? 0;
