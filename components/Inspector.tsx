@@ -29,8 +29,11 @@ interface Props {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-line bg-bg px-2.5 py-1.5 text-[12.5px] text-text placeholder:text-faint focus:border-accent/40 focus:outline-none";
-const labelCls = "mb-1 mt-3.5 block text-[10px] uppercase tracking-[0.16em] text-faint";
+  "w-full rounded-lg border border-line bg-well px-2.5 py-1.5 text-[13px] text-text placeholder:text-faint focus:border-accent/60 focus:outline-none";
+const miniInputCls =
+  "rounded-md border border-line bg-well px-1.5 py-1 text-text placeholder:text-faint focus:border-accent/60 focus:outline-none";
+const labelCls =
+  "mb-1.5 mt-4 block text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute";
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
@@ -38,7 +41,7 @@ function truncate(s: string, n: number) {
 
 export function Inspector({ doc, selection, actions }: Props) {
   return (
-    <aside className="absolute bottom-3 right-3 top-3 z-30 hidden w-[300px] flex-col overflow-y-auto rounded-xl border border-line bg-surface/90 p-4 backdrop-blur-md md:flex">
+    <aside className="absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-line-strong bg-raise p-4 shadow-2xl shadow-black/40 md:flex">
       {selection?.kind === "step" ? (
         <StepPanel
           doc={doc}
@@ -78,7 +81,7 @@ function StepPanel({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-faint">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
           Step
         </span>
         <button
@@ -281,7 +284,7 @@ function StepPanel({
             )}
             <input
               aria-label="Branch condition"
-              className="w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[11.5px] text-text focus:border-line focus:outline-none"
+              className={`${miniInputCls} w-0 flex-1 text-[12px]`}
               value={b.when}
               onChange={(e) => {
                 const next = [...(step.branches ?? [])];
@@ -359,7 +362,7 @@ function EdgePanel({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-faint">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
           {kindLabel}
         </span>
         <button
@@ -418,7 +421,7 @@ function DocPanel({
 
   return (
     <div>
-      <span className="text-[10px] uppercase tracking-[0.2em] text-faint">
+      <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
         Explanation
       </span>
 
@@ -441,11 +444,14 @@ function DocPanel({
           <div key={p.id} className="flex items-center gap-2">
             <span
               className="size-2 shrink-0 rounded-full"
-              style={{ background: colors.get(p.id) }}
+              style={{
+                background: colors.get(p.id),
+                boxShadow: `0 0 6px ${colors.get(p.id)}66`,
+              }}
             />
             <input
               aria-label="Part name"
-              className="w-[88px] rounded border border-transparent bg-transparent px-1 py-0.5 text-[12px] font-medium text-text focus:border-line focus:outline-none"
+              className={`${miniInputCls} w-0 flex-1 text-[12.5px] font-medium`}
               value={p.name}
               onChange={(e) =>
                 actions.updatePart(p.id, { name: e.target.value })
@@ -453,7 +459,7 @@ function DocPanel({
             />
             <input
               aria-label="Part role"
-              className="w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[11.5px] text-mute focus:border-line focus:outline-none"
+              className={`${miniInputCls} w-0 flex-[1.3] text-[12px]`}
               value={p.role ?? ""}
               placeholder="role…"
               onChange={(e) =>
@@ -466,7 +472,7 @@ function DocPanel({
               onClick={() => actions.deletePart(p.id)}
               className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
             >
-              <Trash2 size={11} />
+              <Trash2 size={12} />
             </button>
           </div>
         ))}
@@ -483,9 +489,9 @@ function DocPanel({
       <span className={labelCls}>System loops</span>
       <div className="space-y-1.5">
         {(doc.loops ?? []).map((l, li) => (
-          <div key={li} className="flex items-center gap-1.5 text-[11.5px]">
+          <div key={li} className="flex items-center gap-1.5 text-[12px]">
             <RotateCcw size={11} className="shrink-0 text-accent" />
-            <span className="w-0 flex-1 truncate text-mute">
+            <span className="w-0 flex-1 truncate text-text/85">
               {truncate(stepsById.get(l.from) ?? l.from, 14)} →{" "}
               {truncate(stepsById.get(l.to) ?? l.to, 14)}
             </span>
@@ -527,7 +533,7 @@ function DocPanel({
                   />
                   <input
                     aria-label="Group label"
-                    className="w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[12px] text-text focus:border-line focus:outline-none"
+                    className={`${miniInputCls} w-0 flex-1 text-[12.5px]`}
                     value={g.label}
                     onChange={(e) =>
                       actions.updateGroup(g.id, { label: e.target.value })
@@ -576,7 +582,7 @@ function AddLoop({
       <select
         name="from"
         aria-label="Loop from"
-        className="w-0 flex-1 cursor-pointer appearance-none rounded-lg border border-line bg-bg px-1.5 py-1 text-[11px] text-mute focus:border-accent/40 focus:outline-none"
+        className="w-0 flex-1 cursor-pointer appearance-none rounded-lg border border-line bg-well px-1.5 py-1 text-[11.5px] text-text focus:border-accent/40 focus:outline-none"
         defaultValue={doc.steps[doc.steps.length - 1].id}
       >
         {doc.steps.map((s) => (
@@ -589,7 +595,7 @@ function AddLoop({
       <select
         name="to"
         aria-label="Loop to"
-        className="w-0 flex-1 cursor-pointer appearance-none rounded-lg border border-line bg-bg px-1.5 py-1 text-[11px] text-mute focus:border-accent/40 focus:outline-none"
+        className="w-0 flex-1 cursor-pointer appearance-none rounded-lg border border-line bg-well px-1.5 py-1 text-[11.5px] text-text focus:border-accent/40 focus:outline-none"
         defaultValue={doc.steps[0].id}
       >
         {doc.steps.map((s) => (

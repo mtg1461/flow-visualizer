@@ -48,28 +48,39 @@ export function NodeTile({
         width: NODE_W,
         height: NODE_H,
         borderColor: selected
-          ? withAlpha(accent, "cc")
+          ? accent
           : connectSource
-            ? "rgba(127,214,194,0.8)"
-            : "rgba(255,255,255,0.16)",
+            ? "#7fd6c2"
+            : "rgba(255,255,255,0.28)",
         boxShadow: `inset 3px 0 0 ${accent}${
-          selected ? `, 0 0 0 3px ${withAlpha(accent, "2e")}` : ""
-        }${dragging ? ", 0 16px 40px rgba(0,0,0,0.6)" : ", 0 4px 16px rgba(0,0,0,0.35)"}`,
+          selected ? `, 0 0 0 3px ${withAlpha(accent, "40")}` : ""
+        }${
+          dragging
+            ? ", 0 18px 44px rgba(0,0,0,0.65)"
+            : ", 0 6px 20px rgba(0,0,0,0.45)"
+        }`,
       }}
-      className={`group absolute select-none rounded-lg border bg-tile px-3.5 py-2.5 transition-[border-color,box-shadow] duration-150 hover:border-line-strong ${
+      className={`group absolute select-none rounded-lg border bg-tile transition-[border-color,box-shadow] duration-150 hover:border-line-strong ${
         dragging ? "z-20" : ""
       } ${connectTarget ? "cursor-crosshair" : "cursor-default"}`}
     >
-      <div className="flex items-center gap-1.5">
+      {/* tinted kind band */}
+      <div
+        className="flex items-center gap-1.5 rounded-t-[7px] px-3.5 pb-1.5 pt-2"
+        style={{
+          background: withAlpha(accent, "26"),
+          borderBottom: `1px solid ${withAlpha(accent, "38")}`,
+        }}
+      >
         <span
-          className="text-[9.5px] font-medium uppercase tracking-[0.15em]"
+          className="text-[10px] font-semibold uppercase tracking-[0.15em]"
           style={{ color: accent }}
         >
           {kind.label}
         </span>
         <span className="flex-1" />
         {partName && (
-          <span className="flex min-w-0 items-center gap-1.5 text-[10px] text-mute">
+          <span className="flex min-w-0 items-center gap-1.5 text-[10.5px] text-[#d3d5e4]">
             <span
               className="size-1.5 shrink-0 rounded-full"
               style={{ background: partColor ?? "#9b9bff" }}
@@ -79,7 +90,7 @@ export function NodeTile({
         )}
       </div>
 
-      <h3 className="mt-1.5 line-clamp-2 text-[13.5px] font-medium leading-snug text-text">
+      <h3 className="line-clamp-2 px-3.5 pt-2 text-[13.5px] font-medium leading-snug text-text">
         {step.title}
       </h3>
 
@@ -93,14 +104,14 @@ export function NodeTile({
           e.stopPropagation();
           onPortClick();
         }}
-        className={`absolute -bottom-[13px] left-1/2 -translate-x-1/2 cursor-pointer p-1.5 transition-opacity ${
+        className={`absolute -bottom-[14px] left-1/2 -translate-x-1/2 cursor-pointer p-1.5 transition-opacity ${
           selected || connectSource
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100"
         }`}
       >
         <span
-          className={`block size-3 rounded-full border-2 bg-bg transition-colors ${
+          className={`block size-3.5 rounded-full border-2 bg-bg transition-colors ${
             connectSource ? "border-teal" : "border-accent hover:border-teal"
           }`}
         />

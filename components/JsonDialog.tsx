@@ -98,7 +98,7 @@ export function JsonDialog({ open, doc, onClose, onApply }: Props) {
             setError(null);
           }}
           spellCheck={false}
-          className="mt-4 min-h-[280px] w-full flex-1 resize-none rounded-xl border border-line bg-bg p-3.5 font-mono text-[12px] leading-relaxed text-text focus:border-accent/40 focus:outline-none"
+          className="mt-4 min-h-[280px] w-full flex-1 resize-none rounded-xl border border-line bg-well p-3.5 font-mono text-[12px] leading-relaxed text-text focus:border-accent/60 focus:outline-none"
         />
 
         {error && (

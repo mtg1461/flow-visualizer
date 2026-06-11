@@ -49,9 +49,9 @@ interface View {
 }
 
 const EDGE_STYLE = {
-  forward: { stroke: "rgba(228,230,246,0.5)", dash: undefined, marker: "soft" },
-  feedback: { stroke: "rgba(238,194,122,0.9)", dash: "5 5", marker: "amber" },
-  loop: { stroke: "rgba(155,155,255,0.85)", dash: "2.5 6", marker: "accent" },
+  forward: { stroke: "rgba(232,234,248,0.65)", dash: undefined, marker: "soft" },
+  feedback: { stroke: "rgba(238,194,122,1)", dash: "5 5", marker: "amber" },
+  loop: { stroke: "rgba(165,165,255,1)", dash: "2.5 6", marker: "accent" },
 } as const;
 
 export function Canvas({
@@ -377,7 +377,7 @@ export function Canvas({
           className="absolute -inset-[4000px]"
           style={{
             backgroundImage:
-              "radial-gradient(circle, rgba(255,255,255,0.085) 1px, transparent 1.4px)",
+              "radial-gradient(circle, rgba(255,255,255,0.11) 1px, transparent 1.4px)",
             backgroundSize: "26px 26px",
           }}
         />
@@ -393,13 +393,13 @@ export function Canvas({
               top: r.top,
               width: r.width,
               height: r.height,
-              borderColor: withAlpha(r.color, "59"),
-              background: withAlpha(r.color, "0d"),
+              borderColor: withAlpha(r.color, "73"),
+              background: withAlpha(r.color, "10"),
             }}
           >
             <span
-              className="absolute left-3.5 top-2 text-[10px] font-medium uppercase tracking-[0.18em]"
-              style={{ color: withAlpha(r.color, "d9") }}
+              className="absolute left-3.5 top-2 text-[10.5px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: r.color }}
             >
               {r.label}
             </span>
@@ -430,9 +430,9 @@ export function Canvas({
           <defs>
             {(
               [
-                ["soft", "rgba(228,230,246,0.75)"],
+                ["soft", "rgba(232,234,248,0.9)"],
                 ["amber", "rgba(238,194,122,1)"],
-                ["accent", "rgba(155,155,255,1)"],
+                ["accent", "rgba(165,165,255,1)"],
                 ["teal", "rgba(127,214,194,1)"],
               ] as const
             ).map(([name, color]) => (
@@ -523,10 +523,10 @@ export function Canvas({
             const isSel = selectedEdgeKey === edge.key;
             const tone =
               edge.kind === "loop"
-                ? "border-accent/40 text-accent"
+                ? "border-accent/50 text-accent"
                 : edge.backward
-                  ? "border-amber/40 text-amber"
-                  : "border-line-strong text-text/80";
+                  ? "border-amber/50 text-amber"
+                  : "border-line-strong text-text/90";
             return (
               <button
                 key={`lbl-${edge.key}`}
@@ -536,7 +536,7 @@ export function Canvas({
                   e.stopPropagation();
                   onSelect({ kind: "edge", ref: edge.ref });
                 }}
-                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[10.5px] leading-4 shadow-md shadow-black/30 ${tone} ${
+                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[11px] leading-4 shadow-md shadow-black/40 ${tone} ${
                   isSel ? "ring-1 ring-accent/60" : ""
                 }`}
                 style={{ left: edge.labelX, top: edge.labelY }}
@@ -587,13 +587,13 @@ export function Canvas({
 
       {/* connect-mode hint */}
       {connectFrom && (
-        <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/30 bg-bg/90 px-3.5 py-1.5 text-[11.5px] text-teal backdrop-blur">
+        <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/40 bg-raise px-3.5 py-1.5 text-[12px] text-teal shadow-lg shadow-black/30">
           Click a tile to connect — Esc to cancel
         </div>
       )}
 
       {/* zoom controls */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-line bg-surface/90 p-1 backdrop-blur">
+      <div className="absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-line-strong bg-raise p-1 shadow-lg shadow-black/30">
         <button
           type="button"
           aria-label="Zoom out"
@@ -630,7 +630,7 @@ export function Canvas({
       </div>
 
       {/* hint */}
-      <div className="pointer-events-none absolute bottom-5 left-4 hidden text-[11px] text-faint md:block">
+      <div className="pointer-events-none absolute bottom-5 left-4 hidden text-[11.5px] text-mute md:block">
         right-click for actions
       </div>
     </div>

@@ -20,7 +20,7 @@ export function Toolbar({
   onReset,
 }: Props) {
   return (
-    <header className="z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface/60 px-3.5 backdrop-blur-md">
+    <header className="z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line-strong bg-surface px-3.5">
       <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
         <path
           d="M3 15 C 3 8, 15 10, 15 3"
@@ -33,7 +33,7 @@ export function Toolbar({
       </svg>
       <input
         aria-label="Explanation title"
-        className="w-[200px] rounded-md border border-transparent bg-transparent px-2 py-1 text-[13px] font-medium text-text placeholder:text-faint hover:border-line focus:border-line-strong focus:outline-none md:w-[340px]"
+        className="w-[200px] rounded-md border border-transparent bg-transparent px-2 py-1 text-[13.5px] font-medium text-text placeholder:text-faint hover:border-line-strong focus:border-accent/50 focus:outline-none md:w-[340px]"
         value={title}
         placeholder="How … works"
         onChange={(e) => onTitle(e.target.value)}
@@ -43,7 +43,7 @@ export function Toolbar({
         <button
           type="button"
           onClick={onReset}
-          className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-faint transition-colors hover:text-mute"
+          className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-mute transition-colors hover:text-text"
         >
           <Undo2 size={12} />
           Sample
@@ -52,7 +52,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onAddStep}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12.5px] text-mute transition-colors hover:border-line-strong hover:text-text"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
       >
         <Plus size={13} />
         Step
@@ -60,7 +60,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onOpenJson}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/25 bg-accent/10 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/20"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
       >
         <Braces size={13} />
         JSON
