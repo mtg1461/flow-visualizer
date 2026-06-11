@@ -1,10 +1,13 @@
 "use client";
 
-import { Braces, Plus, Undo2 } from "lucide-react";
+import { Braces, Plus, Sparkles, Undo2, Wand2 } from "lucide-react";
 
 interface Props {
   title: string;
   isCustom: boolean;
+  canUndo: boolean;
+  onUndo: () => void;
+  onTidy: () => void;
   onTitle: (title: string) => void;
   onAddStep: () => void;
   onOpenJson: () => void;
@@ -14,6 +17,9 @@ interface Props {
 export function Toolbar({
   title,
   isCustom,
+  canUndo,
+  onUndo,
+  onTidy,
   onTitle,
   onAddStep,
   onOpenJson,
@@ -45,10 +51,29 @@ export function Toolbar({
           onClick={onReset}
           className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] text-mute transition-colors hover:text-text"
         >
-          <Undo2 size={12} />
+          <Sparkles size={12} />
           Sample
         </button>
       )}
+      <button
+        type="button"
+        title="Undo (Ctrl+Z)"
+        aria-label="Undo"
+        onClick={onUndo}
+        disabled={!canUndo}
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line-strong bg-raise text-text/90 transition-colors hover:bg-tile disabled:cursor-not-allowed disabled:opacity-35"
+      >
+        <Undo2 size={13} />
+      </button>
+      <button
+        type="button"
+        title="Re-run the automatic layout"
+        onClick={onTidy}
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
+      >
+        <Wand2 size={13} />
+        Tidy
+      </button>
       <button
         type="button"
         onClick={onAddStep}

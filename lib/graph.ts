@@ -465,5 +465,23 @@ export function routeEdges(
     }
     routed.push({ ...e, d: orthoPath(pts), labelX: lx, labelY: ly });
   }
+
+  // nudge overlapping labels apart (top-down, so pushes accumulate)
+  const estW = (s: string) => Math.min(170, s.length * 5.8 + 18);
+  const labeled = routed.filter((e) => e.label);
+  labeled.sort((a, b) => a.labelY - b.labelY || a.labelX - b.labelX);
+  for (let i = 1; i < labeled.length; i++) {
+    for (let j = 0; j < i; j++) {
+      const a = labeled[j];
+      const b = labeled[i];
+      if (
+        Math.abs(a.labelX - b.labelX) * 2 < estW(a.label!) + estW(b.label!) &&
+        Math.abs(a.labelY - b.labelY) < 22
+      ) {
+        b.labelY = a.labelY + 22;
+      }
+    }
+  }
+
   return routed;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EdgeLine, Explanation, Step } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
 import {
@@ -19,9 +19,41 @@ import { JsonDialog } from "./JsonDialog";
 
 export const STORAGE_KEY = "unfold:data";
 
+const HISTORY_LIMIT = 100;
+/** Edits with the same coalesce key inside this window share one undo entry. */
+const COALESCE_MS = 1000;
+
 interface Props {
   initial: Explanation;
   initialCustom: boolean;
+}
+
+function persist(doc: Explanation | null) {
+  try {
+    if (doc) localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // storage unavailable — edits still live for this session
+  }
+}
+
+/** Drops a selection that points at something the restored doc lacks. */
+function validSelection(
+  doc: Explanation,
+  sel: Selection | null
+): Selection | null {
+  if (!sel) return null;
+  if (sel.kind === "step")
+    return doc.steps.some((s) => s.id === sel.id) ? sel : null;
+  const ref = sel.ref;
+  if (ref.type === "flow")
+    return doc.steps.find((s) => s.id === ref.from)?.then ? sel : null;
+  if (ref.type === "branch")
+    return (doc.steps.find((s) => s.id === ref.from)?.branches?.length ?? 0) >
+      ref.index
+      ? sel
+      : null;
+  return (doc.loops?.length ?? 0) > ref.index ? sel : null;
 }
 
 export function Editor({ initial, initialCustom }: Props) {
@@ -31,15 +63,57 @@ export function Editor({ initial, initialCustom }: Props) {
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [fitSignal, setFitSignal] = useState(0);
 
-  const setDoc = useCallback((next: Explanation) => {
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const past = useRef<Explanation[]>([]);
+  const future = useRef<Explanation[]>([]);
+  const lastCommit = useRef({ key: "", at: 0 });
+
+  const commit = useCallback((next: Explanation, coalesceKey?: string) => {
+    const now = Date.now();
+    const merge =
+      !!coalesceKey &&
+      coalesceKey === lastCommit.current.key &&
+      now - lastCommit.current.at < COALESCE_MS;
+    if (!merge) {
+      past.current.push(docRef.current);
+      if (past.current.length > HISTORY_LIMIT) past.current.shift();
+    }
+    lastCommit.current = { key: coalesceKey ?? "", at: now };
+    future.current = [];
+    setCanUndo(true);
     setDocState(next);
     setIsCustom(true);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // storage unavailable — edits still live for this session
-    }
+    persist(next);
+  }, []);
+
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(docRef.current);
+    lastCommit.current = { key: "", at: 0 };
+    setCanUndo(past.current.length > 0);
+    setDocState(prev);
+    setIsCustom(true);
+    persist(prev);
+    setSelection((s) => validSelection(prev, s));
+    setConnectFrom(null);
+  }, []);
+
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(docRef.current);
+    lastCommit.current = { key: "", at: 0 };
+    setCanUndo(true);
+    setDocState(next);
+    setIsCustom(true);
+    persist(next);
+    setSelection((s) => validSelection(next, s));
+    setConnectFrom(null);
   }, []);
 
   const positions = useMemo(() => layoutPositions(doc), [doc]);
@@ -48,58 +122,50 @@ export function Editor({ initial, initialCustom }: Props) {
 
   const updateStep = useCallback(
     (id: string, patch: Partial<Step>) => {
-      setDocState((d) => {
-        const next = {
+      const d = docRef.current;
+      commit(
+        {
           ...d,
           steps: d.steps.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-        };
-        setIsCustom(true);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
+        },
+        `step:${id}:${Object.keys(patch).sort().join(",")}`
+      );
     },
-    []
+    [commit]
   );
 
   const deleteStep = useCallback(
     (id: string) => {
-      setDocState((d) => {
-        if (d.steps.length <= 1) return d;
-        const dying = d.steps.find((s) => s.id === id);
-        const heal = dying?.then && dying.then !== id ? dying.then : undefined;
-        const next: Explanation = {
-          ...d,
-          steps: d.steps
-            .filter((s) => s.id !== id)
-            .map((s) => ({
-              ...s,
-              then: s.then === id ? heal : s.then,
-              branches: s.branches
-                ?.map((b) => (b.to === id && heal ? { ...b, to: heal } : b))
-                .filter((b) => b.to !== id),
-            })),
-          loops: d.loops?.filter((l) => l.from !== id && l.to !== id),
-          groups: d.groups
-            ?.map((g) => ({ ...g, steps: g.steps.filter((s) => s !== id) }))
-            .filter((g) => g.steps.length > 0),
-        };
-        setIsCustom(true);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
+      const d = docRef.current;
+      if (d.steps.length <= 1) return;
+      const dying = d.steps.find((s) => s.id === id);
+      const heal = dying?.then && dying.then !== id ? dying.then : undefined;
+      commit({
+        ...d,
+        steps: d.steps
+          .filter((s) => s.id !== id)
+          .map((s) => ({
+            ...s,
+            then: s.then === id ? heal : s.then,
+            branches: s.branches
+              ?.map((b) => (b.to === id && heal ? { ...b, to: heal } : b))
+              .filter((b) => b.to !== id),
+          })),
+        loops: d.loops?.filter((l) => l.from !== id && l.to !== id),
+        groups: d.groups
+          ?.map((g) => ({ ...g, steps: g.steps.filter((s) => s !== id) }))
+          .filter((g) => g.steps.length > 0),
       });
       setSelection(null);
     },
-    []
+    [commit]
   );
 
   const addStep = useCallback(
     (opts?: { afterId?: string; cell?: Pos }) => {
-      let n = doc.steps.length + 1;
-      while (doc.steps.some((s) => s.id === `step-${n}`)) n++;
+      const d = docRef.current;
+      let n = d.steps.length + 1;
+      while (d.steps.some((s) => s.id === `step-${n}`)) n++;
       const id = `step-${n}`;
 
       const afterId =
@@ -126,10 +192,10 @@ export function Editor({ initial, initialCustom }: Props) {
       let steps: Step[];
       if (afterId) {
         // insert into the flow after the anchor step
-        const i = doc.steps.findIndex((s) => s.id === afterId);
-        const sel = doc.steps[i];
+        const i = d.steps.findIndex((s) => s.id === afterId);
+        const sel = d.steps[i];
         const inherited = !sel.branches?.length ? sel.then : undefined;
-        steps = [...doc.steps];
+        steps = [...d.steps];
         steps[i] = inherited ? { ...sel, then: id } : sel;
         steps.splice(
           i + 1,
@@ -137,12 +203,12 @@ export function Editor({ initial, initialCustom }: Props) {
           inherited ? { ...newStep, then: inherited } : newStep
         );
       } else {
-        steps = [...doc.steps, newStep];
+        steps = [...d.steps, newStep];
       }
-      setDoc({ ...doc, steps });
+      commit({ ...d, steps });
       setSelection({ kind: "step", id });
     },
-    [doc, selection, positions, setDoc]
+    [commit, selection, positions]
   );
 
   const moveNode = useCallback(
@@ -155,7 +221,8 @@ export function Editor({ initial, initialCustom }: Props) {
       const from = connectFrom;
       setConnectFrom(null);
       if (!from || from === to) return;
-      const src = doc.steps.find((s) => s.id === from);
+      const d = docRef.current;
+      const src = d.steps.find((s) => s.id === from);
       if (!src) return;
       if (src.kind === "decision") {
         if (src.branches?.some((b) => b.to === to)) return;
@@ -172,62 +239,65 @@ export function Editor({ initial, initialCustom }: Props) {
         setSelection({ kind: "edge", ref: { type: "flow", from } });
       } else {
         // the flow edge exists — additional connections become loop entries
-        const loops = [...(doc.loops ?? []), { from, to }];
-        setDoc({ ...doc, loops });
+        const loops = [...(d.loops ?? []), { from, to }];
+        commit({ ...d, loops });
         setSelection({
           kind: "edge",
           ref: { type: "loop", index: loops.length - 1 },
         });
       }
     },
-    [connectFrom, doc, updateStep, setDoc]
+    [connectFrom, updateStep, commit]
   );
 
   const deleteEdge = useCallback(
     (ref: EdgeRef) => {
+      const d = docRef.current;
       if (ref.type === "flow") {
         updateStep(ref.from, { then: undefined });
       } else if (ref.type === "branch") {
-        const src = doc.steps.find((s) => s.id === ref.from);
+        const src = d.steps.find((s) => s.id === ref.from);
         const branches = (src?.branches ?? []).filter((_, i) => i !== ref.index);
         updateStep(ref.from, {
           branches: branches.length ? branches : undefined,
         });
       } else {
-        setDoc({
-          ...doc,
-          loops: doc.loops?.filter((_, i) => i !== ref.index),
-        });
+        commit({ ...d, loops: d.loops?.filter((_, i) => i !== ref.index) });
       }
       setSelection(null);
     },
-    [doc, updateStep, setDoc]
+    [updateStep, commit]
   );
 
   const updateEdgeLabel = useCallback(
     (ref: EdgeRef, label: string) => {
+      const d = docRef.current;
       if (ref.type === "branch") {
-        const src = doc.steps.find((s) => s.id === ref.from);
+        const src = d.steps.find((s) => s.id === ref.from);
         const branches = (src?.branches ?? []).map((b, i) =>
           i === ref.index ? { ...b, when: label } : b
         );
         updateStep(ref.from, { branches });
       } else if (ref.type === "loop") {
-        setDoc({
-          ...doc,
-          loops: doc.loops?.map((l, i) =>
-            i === ref.index ? { ...l, label: label || undefined } : l
-          ),
-        });
+        commit(
+          {
+            ...d,
+            loops: d.loops?.map((l, i) =>
+              i === ref.index ? { ...l, label: label || undefined } : l
+            ),
+          },
+          `loop-label:${ref.index}`
+        );
       } else {
         updateStep(ref.from, { thenLabel: label || undefined });
       }
     },
-    [doc, updateStep, setDoc]
+    [updateStep, commit]
   );
 
   const updateEdgeStyle = useCallback(
     (ref: EdgeRef, patch: { color?: string | null; line?: EdgeLine | null }) => {
+      const d = docRef.current;
       const color =
         patch.color === undefined ? undefined : (patch.color ?? undefined);
       const line =
@@ -238,16 +308,19 @@ export function Editor({ initial, initialCustom }: Props) {
         ...("line" in patch ? { line } : {}),
       });
       if (ref.type === "branch") {
-        const src = doc.steps.find((s) => s.id === ref.from);
+        const src = d.steps.find((s) => s.id === ref.from);
         const branches = (src?.branches ?? []).map((b, i) =>
           i === ref.index ? apply(b) : b
         );
         updateStep(ref.from, { branches });
       } else if (ref.type === "loop") {
-        setDoc({
-          ...doc,
-          loops: doc.loops?.map((l, i) => (i === ref.index ? apply(l) : l)),
-        });
+        commit(
+          {
+            ...d,
+            loops: d.loops?.map((l, i) => (i === ref.index ? apply(l) : l)),
+          },
+          `loop-style:${ref.index}`
+        );
       } else {
         updateStep(ref.from, {
           ...("color" in patch ? { thenColor: color } : {}),
@@ -255,12 +328,45 @@ export function Editor({ initial, initialCustom }: Props) {
         });
       }
     },
-    [doc, updateStep, setDoc]
+    [updateStep, commit]
   );
+
+  const tidy = useCallback(() => {
+    const d = docRef.current;
+    if (d.steps.some((s) => s.grid)) {
+      commit({
+        ...d,
+        steps: d.steps.map((s) => {
+          if (!s.grid) return s;
+          const { grid: _dropped, ...rest } = s;
+          return rest;
+        }),
+      });
+    }
+    setFitSignal((s) => s + 1);
+  }, [commit]);
+
+  const reset = useCallback(() => {
+    past.current.push(docRef.current);
+    if (past.current.length > HISTORY_LIMIT) past.current.shift();
+    future.current = [];
+    lastCommit.current = { key: "", at: 0 };
+    setCanUndo(true);
+    setDocState(normalize(SAMPLE));
+    setIsCustom(false);
+    persist(null);
+    setSelection(null);
+    setConnectFrom(null);
+    setFitSignal((s) => s + 1);
+  }, []);
 
   const actions: EditorActions = useMemo(
     () => ({
-      updateDoc: (patch) => setDoc({ ...doc, ...patch }),
+      updateDoc: (patch) =>
+        commit(
+          { ...docRef.current, ...patch },
+          `doc:${Object.keys(patch).sort().join(",")}`
+        ),
       updateStep,
       deleteStep,
       startConnect: (id) => setConnectFrom(id),
@@ -268,30 +374,40 @@ export function Editor({ initial, initialCustom }: Props) {
       updateEdgeLabel,
       updateEdgeStyle,
       addPart: (name) => {
-        let base = name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "") || "part";
+        const d = docRef.current;
+        const base =
+          name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "part";
         let id = base;
         let n = 2;
-        while ((doc.parts ?? []).some((p) => p.id === id)) id = `${base}-${n++}`;
-        setDoc({ ...doc, parts: [...(doc.parts ?? []), { id, name }] });
+        while ((d.parts ?? []).some((p) => p.id === id)) id = `${base}-${n++}`;
+        commit({ ...d, parts: [...(d.parts ?? []), { id, name }] });
       },
-      updatePart: (id, patch) =>
-        setDoc({
-          ...doc,
-          parts: doc.parts?.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-        }),
-      deletePart: (id) =>
-        setDoc({
-          ...doc,
-          parts: doc.parts?.filter((p) => p.id !== id),
-          steps: doc.steps.map((s) =>
+      updatePart: (id, patch) => {
+        const d = docRef.current;
+        commit(
+          {
+            ...d,
+            parts: d.parts?.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+          },
+          `part:${id}:${Object.keys(patch).sort().join(",")}`
+        );
+      },
+      deletePart: (id) => {
+        const d = docRef.current;
+        commit({
+          ...d,
+          parts: d.parts?.filter((p) => p.id !== id),
+          steps: d.steps.map((s) =>
             s.part === id ? { ...s, part: undefined } : s
           ),
-        }),
+        });
+      },
       assignGroup: (stepId, groupId) => {
-        let groups = (doc.groups ?? []).map((g) => ({
+        const d = docRef.current;
+        let groups = (d.groups ?? []).map((g) => ({
           ...g,
           steps: g.steps.filter((s) => s !== stepId),
         }));
@@ -304,32 +420,45 @@ export function Editor({ initial, initialCustom }: Props) {
             g.id === groupId ? { ...g, steps: [...g.steps, stepId] } : g
           );
         }
-        setDoc({
-          ...doc,
-          groups: groups.filter((g) => g.steps.length > 0).length
-            ? groups.filter((g) => g.steps.length > 0)
-            : undefined,
-        });
+        const kept = groups.filter((g) => g.steps.length > 0);
+        commit({ ...d, groups: kept.length ? kept : undefined });
       },
-      updateGroup: (id, patch) =>
-        setDoc({
-          ...doc,
-          groups: doc.groups?.map((g) =>
-            g.id === id ? { ...g, ...patch } : g
-          ),
-        }),
+      updateGroup: (id, patch) => {
+        const d = docRef.current;
+        commit(
+          {
+            ...d,
+            groups: d.groups?.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+          },
+          `group:${id}:${Object.keys(patch).sort().join(",")}`
+        );
+      },
       deleteGroup: (id) => {
-        const groups = doc.groups?.filter((g) => g.id !== id);
-        setDoc({ ...doc, groups: groups?.length ? groups : undefined });
+        const d = docRef.current;
+        const groups = d.groups?.filter((g) => g.id !== id);
+        commit({ ...d, groups: groups?.length ? groups : undefined });
       },
     }),
-    [doc, setDoc, updateStep, deleteStep, deleteEdge, updateEdgeLabel, updateEdgeStyle]
+    [commit, updateStep, deleteStep, deleteEdge, updateEdgeLabel, updateEdgeStyle]
   );
 
   /* -------------------------------------------------------- keyboard */
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // undo/redo work everywhere, including inside inputs — all input
+      // values are doc state, so this is the only undo that makes sense
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
       const target = e.target as HTMLElement | null;
       if (
         target &&
@@ -352,7 +481,7 @@ export function Editor({ initial, initialCustom }: Props) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [selection, connectFrom, jsonOpen, deleteStep, deleteEdge]);
+  }, [selection, connectFrom, jsonOpen, deleteStep, deleteEdge, undo, redo]);
 
   /* ---------------------------------------------------------- render */
 
@@ -361,18 +490,13 @@ export function Editor({ initial, initialCustom }: Props) {
       <Toolbar
         title={doc.title}
         isCustom={isCustom}
-        onTitle={(title) => setDoc({ ...doc, title })}
+        canUndo={canUndo}
+        onUndo={undo}
+        onTidy={tidy}
+        onTitle={(title) => commit({ ...doc, title }, "doc:title")}
         onAddStep={() => addStep()}
         onOpenJson={() => setJsonOpen(true)}
-        onReset={() => {
-          setDocState(normalize(SAMPLE));
-          setIsCustom(false);
-          setSelection(null);
-          setConnectFrom(null);
-          try {
-            localStorage.removeItem(STORAGE_KEY);
-          } catch {}
-        }}
+        onReset={reset}
       />
       <div className="relative min-h-0 flex-1">
         <Canvas
@@ -380,6 +504,7 @@ export function Editor({ initial, initialCustom }: Props) {
           positions={positions}
           selection={selection}
           connectFrom={connectFrom}
+          fitSignal={fitSignal}
           onSelect={setSelection}
           onClearSelection={() => setSelection(null)}
           onMoveNode={moveNode}
@@ -394,8 +519,9 @@ export function Editor({ initial, initialCustom }: Props) {
             menu={menu}
             currentColor={
               menu.target.type === "tile"
-                ? doc.steps.find((s) => s.id === (menu.target as { id: string }).id)
-                    ?.color
+                ? doc.steps.find(
+                    (s) => s.id === (menu.target as { id: string }).id
+                  )?.color
                 : undefined
             }
             canDelete={doc.steps.length > 1}
@@ -414,10 +540,11 @@ export function Editor({ initial, initialCustom }: Props) {
         doc={doc}
         onClose={() => setJsonOpen(false)}
         onApply={(data) => {
-          setDoc(normalize(data));
+          commit(normalize(data));
           setSelection(null);
           setConnectFrom(null);
           setJsonOpen(false);
+          setFitSignal((s) => s + 1);
         }}
       />
     </div>

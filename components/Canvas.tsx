@@ -34,6 +34,8 @@ interface Props {
   positions: Map<string, Pos>;
   selection: Selection | null;
   connectFrom: string | null;
+  /** Increment to request a fit-to-view (e.g. after Tidy). */
+  fitSignal: number;
   onSelect: (sel: Selection) => void;
   onClearSelection: () => void;
   onMoveNode: (id: string, cell: Pos) => void;
@@ -68,6 +70,7 @@ export function Canvas({
   positions,
   selection,
   connectFrom,
+  fitSignal,
   onSelect,
   onClearSelection,
   onMoveNode,
@@ -180,6 +183,16 @@ export function Canvas({
 
   // keep the flow fitted while the user hasn't taken control of the view
   const userMovedView = useRef(false);
+
+  // explicit fit requests (Tidy, JSON apply) override user view control
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+  useEffect(() => {
+    if (fitSignal > 0) {
+      userMovedView.current = false;
+      fitRef.current();
+    }
+  }, [fitSignal]);
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
