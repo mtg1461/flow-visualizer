@@ -25,6 +25,8 @@ interface Explanation {
     then?: string;          // next step id when flow does NOT continue to the
                             // following step (earlier id = feedback loop)
     note?: string;          // optional caveat or aside
+    grid?: { col: number; row: number }; // canvas position — OMIT this;
+                            // the tool manages it
   }[];
   loops?: {                 // system-level feedback beyond step-to-step flow
     from: string;           // step id

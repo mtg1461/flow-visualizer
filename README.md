@@ -1,12 +1,12 @@
 # Unfold
 
-A minimal visual explanation surface. Paste an AI agent's structured JSON
-explanation of how something works and see it as one elegant flow — the moving
-parts, the sequence, the decisions, the feedback loops, and what flows in and
-out at every step.
+A tile-based 2D flow editor for AI-agent explanations. Paste an agent's
+structured JSON description of how something works and it renders as an
+auto-laid-out flow graph — tiles on a grid, decision branches fanning into
+columns, feedback as dashed channels. Edit the graph directly and the JSON
+updates with it.
 
-Not an IDE, not a dashboard, not a diagram editor. One spine, read top to
-bottom.
+Not draw.io, not a dashboard: one canvas, one inspector, one JSON contract.
 
 ## Run
 
@@ -17,17 +17,25 @@ npm run dev   # http://localhost:4400
 
 ## Use
 
-1. Click **Paste explanation** → **Copy the schema prompt**.
-2. Give the prompt to your agent at the end of any "how does X work" conversation.
-3. Paste the JSON it returns. The flow persists in `localStorage`.
+- **JSON** (toolbar) → **Schema prompt** → give it to your agent at the end of
+  any "how does X work" conversation, then paste the JSON it returns and
+  **Apply**. Try [examples/thermostat.json](examples/thermostat.json).
+- Drag tiles to rearrange (positions persist via the optional `grid` field).
+- Click a tile to edit it in the inspector; click its ○ port, then another
+  tile, to connect (decision steps get condition branches, everything else
+  gets its next step).
+- Click an edge or its label to edit the condition / loop description.
+- With nothing selected the inspector edits the summary, moving parts, and
+  system loops. `Delete` removes the selection, `Esc` deselects.
+- Everything autosaves to `localStorage`; **JSON → Copy JSON** exports the
+  current state, edits included.
 
-The data shape is `Explanation` in [lib/types.ts](lib/types.ts): ordered
-`steps` (the spine), `branches` on decision steps, backward references render
-as dashed feedback arcs, and `loops` capture system-level feedback.
+The data shape is `Explanation` in [lib/types.ts](lib/types.ts). Layout,
+edge-building, and orthogonal routing live in [lib/graph.ts](lib/graph.ts).
 
 ## Stack
 
 Next.js 15 (App Router) · TypeScript · Tailwind v4 · lucide-react
 
-Animations are pure CSS (from-only keyframes), so content is never gated on
-JavaScript animation state and `prefers-reduced-motion` is honored for free.
+No canvas/graph library — tiles are absolutely-positioned divs over one SVG
+edge layer in a panned/zoomed transform. Animations are pure CSS.

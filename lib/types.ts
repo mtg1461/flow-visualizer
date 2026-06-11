@@ -35,6 +35,8 @@ export interface Step {
   then?: string;
   /** Optional caveat or aside. */
   note?: string;
+  /** Tile position on the canvas. Managed by the tool — agents omit it. */
+  grid?: { col: number; row: number };
 }
 
 export interface Loop {

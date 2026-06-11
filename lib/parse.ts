@@ -65,6 +65,7 @@ export function parseExplanation(raw: string): ParseResult {
         : undefined,
       then: typeof s.then === "string" ? s.then : undefined,
       note: typeof s.note === "string" ? s.note : undefined,
+      grid: isGrid(s.grid) ? { col: s.grid.col, row: s.grid.row } : undefined,
     });
   }
 
@@ -107,6 +108,15 @@ export function parseExplanation(raw: string): ParseResult {
       loops,
     },
   };
+}
+
+function isGrid(v: unknown): v is { col: number; row: number } {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as Record<string, unknown>).col === "number" &&
+    typeof (v as Record<string, unknown>).row === "number"
+  );
 }
 
 function strArray(v: unknown): string[] | undefined {
