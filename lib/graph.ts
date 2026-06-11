@@ -294,9 +294,11 @@ export function routeEdges(
 
   const span = (e: EdgeDesc) =>
     Math.abs(P(e.from).row - P(e.to).row) + Math.abs(P(e.from).col - P(e.to).col);
+  // edges that climb a right-side channel: any non-loop edge whose target
+  // sits on a higher row, regardless of narrative direction
   const rightChan = new Map<string, number>();
   edges
-    .filter((e) => e.backward && e.kind !== "loop")
+    .filter((e) => e.kind !== "loop" && P(e.to).row < P(e.from).row)
     .sort((a, b) => span(a) - span(b))
     .forEach((e, i) => rightChan.set(e.key, i));
   const leftChan = new Map<string, number>();
@@ -334,9 +336,24 @@ export function routeEdges(
       ];
       lx = chanX;
       ly = (ay + by) / 2;
-    } else if (e.backward) {
-      if (A.row === B.row) {
-        // same-row feedback hops over the top gutter
+    } else if (B.row < A.row) {
+      // target sits above the source — climb a right-side channel and
+      // enter through the target's side, never its top
+      const chan = rightChan.get(e.key) ?? 0;
+      const chanX = Math.max(A.x, B.x) + NODE_W + 24 + chan * 14;
+      const ay = A.y + NODE_H / 2;
+      const by = B.y + NODE_H / 2;
+      pts = [
+        { x: A.x + NODE_W, y: ay },
+        { x: chanX, y: ay },
+        { x: chanX, y: by },
+        { x: B.x + NODE_W, y: by },
+      ];
+      lx = chanX;
+      ly = (ay + by) / 2;
+    } else if (B.row === A.row) {
+      if (e.backward) {
+        // same-row retry hops over the top gutter
         const gy = A.row * CELL_H + 10;
         pts = [
           { x: A.x + NODE_W / 2, y: A.y },
@@ -347,33 +364,20 @@ export function routeEdges(
         lx = (A.x + B.x + NODE_W) / 2;
         ly = gy;
       } else {
-        const chan = rightChan.get(e.key) ?? 0;
-        const chanX = Math.max(A.x, B.x) + NODE_W + 24 + chan * 14;
         const ay = A.y + NODE_H / 2;
-        const by = B.y + NODE_H / 2;
-        pts = [
-          { x: A.x + NODE_W, y: ay },
-          { x: chanX, y: ay },
-          { x: chanX, y: by },
-          { x: B.x + NODE_W, y: by },
-        ];
-        lx = chanX;
-        ly = (ay + by) / 2;
+        pts =
+          B.col > A.col
+            ? [
+                { x: A.x + NODE_W, y: ay },
+                { x: B.x, y: ay },
+              ]
+            : [
+                { x: A.x, y: ay },
+                { x: B.x + NODE_W, y: ay },
+              ];
+        lx = (A.x + B.x + NODE_W) / 2;
+        ly = ay - 14;
       }
-    } else if (B.row === A.row) {
-      const ay = A.y + NODE_H / 2;
-      pts =
-        B.col > A.col
-          ? [
-              { x: A.x + NODE_W, y: ay },
-              { x: B.x, y: ay },
-            ]
-          : [
-              { x: A.x, y: ay },
-              { x: B.x + NODE_W, y: ay },
-            ];
-      lx = (A.x + B.x + NODE_W) / 2;
-      ly = ay - 14;
     } else {
       const gIdx = gutterCount.get(A.row) ?? 0;
       gutterCount.set(A.row, gIdx + 1);

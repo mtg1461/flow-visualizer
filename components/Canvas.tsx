@@ -371,14 +371,20 @@ export function Canvas({
           transformOrigin: "0 0",
         }}
       >
-        {/* dot grid */}
+        {/* tile-slot lattice — shows exactly where tiles can land */}
         <div
           aria-hidden
-          className="absolute -inset-[4000px]"
+          className="absolute transition-opacity duration-200"
           style={{
-            backgroundImage:
-              "radial-gradient(circle, rgba(255,255,255,0.11) 1px, transparent 1.4px)",
-            backgroundSize: "26px 26px",
+            left: -CELL_W * 12,
+            top: -CELL_H * 24,
+            width: CELL_W * 90,
+            height: CELL_H * 140,
+            opacity: drag ? 1 : 0.45,
+            backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
+              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.12)' stroke-dasharray='5 6'/></svg>`
+            )}")`,
+            backgroundSize: `${CELL_W}px ${CELL_H}px`,
           }}
         />
 
@@ -410,7 +416,7 @@ export function Canvas({
         {drag && dragCell && (
           <div
             aria-hidden
-            className="absolute rounded-xl border border-dashed border-accent/40"
+            className="absolute rounded-[10px] border-2 border-dashed border-accent/70 bg-accent/10"
             style={{
               left: dragCell.col * CELL_W + GX,
               top: dragCell.row * CELL_H + GY,
