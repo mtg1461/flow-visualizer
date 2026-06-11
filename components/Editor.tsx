@@ -224,7 +224,17 @@ export function Editor({ initial, initialCustom }: Props) {
       } else {
         steps = [...d.steps, newStep];
       }
-      commit({ ...d, steps });
+      // a step born inside a region belongs to it
+      const home = (d.groups ?? []).find((g) => {
+        const rect = groupCellRect(g, positions);
+        return rect && cellInRect(rect, cell);
+      });
+      const groups = home
+        ? d.groups?.map((g) =>
+            g.id === home.id ? { ...g, steps: [...g.steps, id] } : g
+          )
+        : d.groups;
+      commit({ ...d, steps, groups });
       setSelection({ kind: "step", id });
     },
     [commit, selection, positions]
@@ -291,6 +301,9 @@ export function Editor({ initial, initialCustom }: Props) {
       if (!g || (!dCol && !dRow)) return;
       const pos = layoutPositions(d);
 
+      const inOtherGroup = (sid: string) =>
+        (d.groups ?? []).some((x) => x.id !== id && x.steps.includes(sid));
+
       if (mode === "region") {
         // move only the box; membership re-derives from the new footprint
         const rect = groupCellRect(g, pos);
@@ -309,26 +322,35 @@ export function Editor({ initial, initialCustom }: Props) {
           p.col <= ng.col + ng.cols - 1 &&
           p.row >= ng.row &&
           p.row <= ng.row + ng.rows - 1;
+        // covered tiles belong, unless they belong to another group
+        const steps = d.steps
+          .filter((s) => {
+            const p = pos.get(s.id);
+            if (!p || !inside(p)) return false;
+            return g.steps.includes(s.id) || !inOtherGroup(s.id);
+          })
+          .map((s) => s.id);
         commit({
           ...d,
           groups: d.groups?.map((x) =>
-            x.id === id
-              ? {
-                  ...x,
-                  grid: ng,
-                  steps: x.steps.filter((sid) => {
-                    const p = pos.get(sid);
-                    return p && inside(p);
-                  }),
-                }
-              : x
+            x.id === id ? { ...x, grid: ng, steps } : x
           ),
         });
         return;
       }
 
+      // moving the group takes everything visually inside the box —
+      // stray non-members sitting in the region are adopted
       const members = new Set(g.steps);
-      for (const sid of g.steps) {
+      const rect = groupCellRect(g, pos);
+      if (rect) {
+        for (const s of d.steps) {
+          if (members.has(s.id) || inOtherGroup(s.id)) continue;
+          const p = pos.get(s.id);
+          if (p && cellInRect(rect, p)) members.add(s.id);
+        }
+      }
+      for (const sid of members) {
         const p = pos.get(sid);
         if (!p) continue;
         const c = p.col + dCol;
@@ -352,18 +374,58 @@ export function Editor({ initial, initialCustom }: Props) {
           return { ...s, grid: { col: p.col + dCol, row: p.row + dRow } };
         }),
         groups: d.groups?.map((x) =>
-          x.id === id && x.grid
+          x.id === id
             ? {
                 ...x,
-                grid: {
-                  ...x.grid,
-                  col: x.grid.col + dCol,
-                  row: x.grid.row + dRow,
-                },
+                steps: [...members],
+                grid: x.grid
+                  ? {
+                      ...x.grid,
+                      col: x.grid.col + dCol,
+                      row: x.grid.row + dRow,
+                    }
+                  : undefined,
               }
             : x
         ),
       });
+    },
+    [commit]
+  );
+
+  const resizeGroup = useCallback(
+    (id: string, grid: { col: number; row: number; cols: number; rows: number }) => {
+      const d = docRef.current;
+      const g = d.groups?.find((x) => x.id === id);
+      if (!g) return;
+      const pos = layoutPositions(d);
+      const rect = {
+        minC: grid.col,
+        maxC: grid.col + grid.cols - 1,
+        minR: grid.row,
+        maxR: grid.row + grid.rows - 1,
+      };
+      const inOtherGroup = (sid: string) =>
+        (d.groups ?? []).some((x) => x.id !== id && x.steps.includes(sid));
+      // the resized footprint adopts the tiles it now covers
+      const adopted = d.steps
+        .filter((s) => {
+          if (g.steps.includes(s.id) || inOtherGroup(s.id)) return false;
+          const p = pos.get(s.id);
+          return p && cellInRect(rect, p);
+        })
+        .map((s) => s.id);
+      commit(
+        {
+          ...d,
+          groups: d.groups?.map((x) =>
+            x.id === id
+              ? { ...x, grid, steps: [...x.steps, ...adopted] }
+              : x
+          ),
+        },
+        `group:${id}:grid`
+      );
     },
     [commit]
   );
@@ -693,7 +755,7 @@ export function Editor({ initial, initialCustom }: Props) {
           onClearSelection={() => setSelection(null)}
           onMoveNode={moveNode}
           onMoveGroup={moveGroup}
-          onResizeGroup={(id, grid) => actions.updateGroup(id, { grid })}
+          onResizeGroup={resizeGroup}
           onStartConnect={setConnectFrom}
           onCompleteConnect={completeConnect}
           onCancelConnect={() => setConnectFrom(null)}

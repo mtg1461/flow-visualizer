@@ -9,7 +9,7 @@ export type MenuTarget =
   | { type: "tile"; id: string }
   | { type: "canvas"; cell: Pos }
   | { type: "edge"; ref: EdgeRef }
-  | { type: "group"; id: string };
+  | { type: "group"; id: string; cell: Pos };
 
 export interface MenuState {
   x: number;
@@ -183,6 +183,18 @@ export function ContextMenu({
 
       {target.type === "group" && (
         <>
+          <button
+            type="button"
+            role="menuitem"
+            className={itemCls}
+            onClick={() => {
+              onAddAt(target.cell);
+              onClose();
+            }}
+          >
+            <Plus size={13} className="text-faint" />
+            Add step here
+          </button>
           <div className="flex items-center gap-1.5 px-3 py-1.5">
             {STEP_PALETTE.slice(0, 7).map((c) => (
               <button

@@ -105,6 +105,8 @@ export function Canvas({
     valid: boolean;
     mode: "all" | "region";
     base: { col: number; row: number; cols: number; rows: number } | null;
+    /** Everything the drag carries: members plus adopted strays inside. */
+    members: string[];
   } | null>(null);
   const [groupResize, setGroupResize] = useState<{
     id: string;
@@ -168,19 +170,16 @@ export function Canvas({
       groupDrag.mode === "all" &&
       (groupDrag.dCol || groupDrag.dRow)
     ) {
-      const g = doc.groups?.find((x) => x.id === groupDrag.id);
-      if (g) {
-        const m = new Map(positions);
-        for (const id of g.steps) {
-          const p = positions.get(id);
-          if (p)
-            m.set(id, {
-              col: p.col + groupDrag.dCol,
-              row: p.row + groupDrag.dRow,
-            });
-        }
-        return m;
+      const m = new Map(positions);
+      for (const id of groupDrag.members) {
+        const p = positions.get(id);
+        if (p)
+          m.set(id, {
+            col: p.col + groupDrag.dCol,
+            row: p.row + groupDrag.dRow,
+          });
       }
+      return m;
     }
     return positions;
   }, [positions, drag, dragCell, groupDrag, doc.groups]);
@@ -388,8 +387,17 @@ export function Canvas({
     }
     const group = el.closest?.("[data-group-id]");
     if (group) {
+      const w = toWorld(e.clientX, e.clientY);
       onMenu(
-        { type: "group", id: (group as HTMLElement).dataset.groupId! },
+        {
+          type: "group",
+          id: (group as HTMLElement).dataset.groupId!,
+          cell: nearestFreeCell(
+            positions,
+            (w.x - GX) / CELL_W,
+            (w.y - GY) / CELL_H
+          ),
+        },
         e.clientX,
         e.clientY
       );
@@ -536,6 +544,27 @@ export function Canvas({
             rows: rect0.maxR - rect0.minR + 1,
           }
         : null);
+    // the drag carries members plus stray tiles sitting inside the box
+    // (matching what the drop adopts), unless they belong to another group
+    const carried = new Set(g0?.steps ?? []);
+    if (mode === "all" && g0 && rect0) {
+      for (const s of doc.steps) {
+        if (carried.has(s.id)) continue;
+        if (doc.groups?.some((x) => x.id !== id && x.steps.includes(s.id)))
+          continue;
+        const p = positions.get(s.id);
+        if (
+          p &&
+          p.col >= rect0.minC &&
+          p.col <= rect0.maxC &&
+          p.row >= rect0.minR &&
+          p.row <= rect0.maxR
+        )
+          carried.add(s.id);
+      }
+    }
+    const members = [...carried];
+
     const w = toWorld(e.clientX, e.clientY);
     groupDragRef.current = { id, sx: w.x, sy: w.y, moved: false };
     let last: { dCol: number; dRow: number; valid: boolean } | null = null;
@@ -548,7 +577,6 @@ export function Canvas({
       d.moved = true;
       const dCol = Math.round((wp.x - d.sx) / CELL_W);
       const dRow = Math.round((wp.y - d.sy) / CELL_H);
-      const g = doc.groups?.find((x) => x.id === d.id);
       let valid = true;
       if (mode === "region") {
         valid =
@@ -557,9 +585,8 @@ export function Canvas({
           base.col + base.cols - 1 + dCol <= GRID_LIMITS.maxCol &&
           base.row + dRow >= GRID_LIMITS.minRow &&
           base.row + base.rows - 1 + dRow <= GRID_LIMITS.maxRow;
-      } else if (g) {
-        const members = new Set(g.steps);
-        outer: for (const sid of g.steps) {
+      } else {
+        outer: for (const sid of members) {
           const p = positions.get(sid);
           if (!p) continue;
           const c = p.col + dCol;
@@ -574,7 +601,7 @@ export function Canvas({
             break;
           }
           for (const [oid, op] of positions) {
-            if (!members.has(oid) && op.col === c && op.row === r) {
+            if (!carried.has(oid) && op.col === c && op.row === r) {
               valid = false;
               break outer;
             }
@@ -582,7 +609,7 @@ export function Canvas({
         }
       }
       last = { dCol, dRow, valid };
-      setGroupDrag({ id: d.id, dCol, dRow, valid, mode, base });
+      setGroupDrag({ id: d.id, dCol, dRow, valid, mode, base, members });
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
