@@ -13,6 +13,23 @@ export interface Pos {
   row: number;
 }
 
+/** The canvas extends in every direction, but not forever. The slot
+ *  lattice renders exactly this range, so the visible grid is the limit. */
+export const GRID_LIMITS = {
+  minCol: -12,
+  maxCol: 60,
+  minRow: -24,
+  maxRow: 120,
+};
+
+function clampCol(c: number) {
+  return Math.min(GRID_LIMITS.maxCol, Math.max(GRID_LIMITS.minCol, c));
+}
+
+function clampRow(r: number) {
+  return Math.min(GRID_LIMITS.maxRow, Math.max(GRID_LIMITS.minRow, r));
+}
+
 export type EdgeRef =
   | { type: "flow"; from: string }
   | { type: "branch"; from: string; index: number }
@@ -187,11 +204,15 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
     } else if (i > 0) {
       desired = pos.get(steps[i - 1].id)?.col ?? 0;
     }
-    desired = Math.max(0, desired);
+    desired = clampCol(desired);
     let col = desired;
     for (let d = 0; d < 60; d++) {
       const candidates =
-        d === 0 ? [desired] : [desired + d, desired - d].filter((c) => c >= 0);
+        d === 0
+          ? [desired]
+          : [desired + d, desired - d].filter(
+              (c) => c >= GRID_LIMITS.minCol && c <= GRID_LIMITS.maxCol
+            );
       const found = candidates.find((c) => !occupied.has(okey(c, r)));
       if (found !== undefined) {
         col = found;
@@ -222,8 +243,8 @@ export function nearestFreeCell(
   row: number,
   excludeId?: string
 ): Pos {
-  col = Math.max(0, Math.round(col));
-  row = Math.max(0, Math.round(row));
+  col = clampCol(Math.round(col));
+  row = clampRow(Math.round(row));
   const occ = new Set<string>();
   for (const [id, p] of pos) if (id !== excludeId) occ.add(`${p.col},${p.row}`);
   if (!occ.has(`${col},${row}`)) return { col, row };
@@ -233,7 +254,14 @@ export function nearestFreeCell(
         if (Math.abs(dr) + Math.abs(dc) !== d) continue;
         const c = col + dc;
         const r = row + dr;
-        if (c >= 0 && r >= 0 && !occ.has(`${c},${r}`)) return { col: c, row: r };
+        if (
+          c >= GRID_LIMITS.minCol &&
+          c <= GRID_LIMITS.maxCol &&
+          r >= GRID_LIMITS.minRow &&
+          r <= GRID_LIMITS.maxRow &&
+          !occ.has(`${c},${r}`)
+        )
+          return { col: c, row: r };
       }
     }
   }

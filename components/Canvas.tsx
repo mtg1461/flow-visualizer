@@ -15,6 +15,7 @@ import type { MenuTarget } from "./ContextMenu";
 import {
   CELL_H,
   CELL_W,
+  GRID_LIMITS,
   GX,
   GY,
   NODE_H,
@@ -144,16 +145,29 @@ export function Canvas({
   const fit = useCallback(() => {
     const root = rootRef.current;
     if (!root || positions.size === 0) return;
-    let maxX = 0;
-    let maxY = 0;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
     for (const p of positions.values()) {
+      minX = Math.min(minX, p.col * CELL_W);
+      minY = Math.min(minY, p.row * CELL_H);
       maxX = Math.max(maxX, p.col * CELL_W + CELL_W);
       maxY = Math.max(maxY, p.row * CELL_H + CELL_H);
     }
+    const w = maxX - minX;
+    const h = maxY - minY;
     const cw = root.clientWidth;
     const ch = root.clientHeight;
-    const k = Math.min(Math.max(Math.min((cw - 80) / maxX, (ch - 80) / maxY), 0.3), 1.15);
-    setView({ x: (cw - maxX * k) / 2, y: Math.max(24, (ch - maxY * k) / 2), k });
+    const k = Math.min(
+      Math.max(Math.min((cw - 80) / w, (ch - 80) / h), 0.3),
+      1.15
+    );
+    setView({
+      x: (cw - w * k) / 2 - minX * k,
+      y: Math.max(24, (ch - h * k) / 2) - minY * k,
+      k,
+    });
   }, [positions]);
 
   const fitOnce = useRef(false);
@@ -389,10 +403,10 @@ export function Canvas({
           aria-hidden
           className="absolute transition-opacity duration-200"
           style={{
-            left: -CELL_W * 12,
-            top: -CELL_H * 24,
-            width: CELL_W * 90,
-            height: CELL_H * 140,
+            left: GRID_LIMITS.minCol * CELL_W,
+            top: GRID_LIMITS.minRow * CELL_H,
+            width: (GRID_LIMITS.maxCol - GRID_LIMITS.minCol + 1) * CELL_W,
+            height: (GRID_LIMITS.maxRow - GRID_LIMITS.minRow + 1) * CELL_H,
             opacity: drag ? 1 : 0.6,
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
               `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
