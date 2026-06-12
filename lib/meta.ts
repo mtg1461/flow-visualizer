@@ -20,7 +20,7 @@ export const STEP_PALETTE = [
   "#f2a98c",
 ];
 
-const PART_PALETTE = [
+const ACTOR_PALETTE = [
   "#9b9bff",
   "#7fd6c2",
   "#eec27a",
@@ -31,13 +31,13 @@ const PART_PALETTE = [
   "#f2a98c",
 ];
 
-/** Stable color per moving part, in declaration order. */
-export function partColors(data: Explanation): Map<string, string> {
+/** Stable color per actor, in declaration order. */
+export function actorColors(data: Explanation): Map<string, string> {
   const map = new Map<string, string>();
-  const declared = data.parts?.map((p) => p.id) ?? [];
-  const used = data.steps.map((s) => s.part).filter((p): p is string => !!p);
+  const declared = data.actors?.map((p) => p.id) ?? [];
+  const used = data.steps.map((s) => s.actor).filter((p): p is string => !!p);
   for (const id of [...declared, ...used]) {
-    if (!map.has(id)) map.set(id, PART_PALETTE[map.size % PART_PALETTE.length]);
+    if (!map.has(id)) map.set(id, ACTOR_PALETTE[map.size % ACTOR_PALETTE.length]);
   }
   return map;
 }

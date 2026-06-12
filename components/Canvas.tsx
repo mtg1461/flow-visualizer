@@ -10,7 +10,7 @@ import {
 } from "react";
 import { GripVertical, Maximize2, Minus, Plus } from "lucide-react";
 import type { Explanation } from "@/lib/types";
-import { partColors, withAlpha } from "@/lib/meta";
+import { actorColors, withAlpha } from "@/lib/meta";
 import type { MenuTarget } from "./ContextMenu";
 import {
   CELL_H,
@@ -132,9 +132,9 @@ export function Canvas({
     moved: boolean;
   } | null>(null);
 
-  const colors = useMemo(() => partColors(doc), [doc]);
-  const partsById = useMemo(
-    () => new Map((doc.parts ?? []).map((p) => [p.id, p])),
+  const colors = useMemo(() => actorColors(doc), [doc]);
+  const actorsById = useMemo(
+    () => new Map((doc.actors ?? []).map((p) => [p.id, p])),
     [doc]
   );
 
@@ -1038,12 +1038,12 @@ export function Canvas({
               connectSource={connectFrom === step.id}
               connectTarget={!!connectFrom && connectFrom !== step.id}
               dragging={isDragging}
-              partName={
-                step.part
-                  ? (partsById.get(step.part)?.name ?? step.part)
+              actorName={
+                step.actor
+                  ? (actorsById.get(step.actor)?.name ?? step.actor)
                   : undefined
               }
-              partColor={step.part ? colors.get(step.part) : undefined}
+              actorColor={step.actor ? colors.get(step.actor) : undefined}
               onPointerDown={startNodeDrag(step.id)}
               onContextMenu={(e) => {
                 e.preventDefault();

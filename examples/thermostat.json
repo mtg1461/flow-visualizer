@@ -1,7 +1,7 @@
 {
   "title": "How a thermostat holds a temperature",
   "summary": "A sensor, a comparison, and a switch — repeated forever. The room itself closes the loop: heat changes the very reading that decides whether to heat.",
-  "parts": [
+  "actors": [
     { "id": "sensor", "name": "Sensor", "role": "reads the room" },
     { "id": "ctrl", "name": "Controller", "role": "compares and decides" },
     { "id": "heater", "name": "Heater", "role": "adds heat" },
@@ -13,14 +13,14 @@
       "title": "The room is measured",
       "detail": "The sensor samples the air every few seconds. Everything downstream trusts this single number.",
       "kind": "input",
-      "part": "sensor"
+      "actor": "sensor"
     },
     {
       "id": "compare",
       "title": "Is the room too cold?",
       "detail": "The controller subtracts the reading from the target. A small dead band around the target stops the heater from flapping on and off.",
       "kind": "decision",
-      "part": "ctrl",
+      "actor": "ctrl",
       "branches": [
         { "when": "below target minus the dead band", "to": "heat" },
         { "when": "inside or above the dead band", "to": "idle" }
@@ -31,7 +31,7 @@
       "title": "The heater switches on",
       "detail": "Heat flows into the room, which slowly raises the next sensor reading — the action changes the input that triggered it.",
       "kind": "process",
-      "part": "heater",
+      "actor": "heater",
       "then": "read"
     },
     {
@@ -39,7 +39,7 @@
       "title": "Everything rests",
       "detail": "The heater stays off while the room slowly leaks heat to the outside, drifting the reading back down until the cycle repeats.",
       "kind": "wait",
-      "part": "room",
+      "actor": "room",
       "then": "read"
     }
   ],

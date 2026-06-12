@@ -12,8 +12,8 @@ interface Props {
   connectSource: boolean;
   connectTarget: boolean;
   dragging: boolean;
-  partName?: string;
-  partColor?: string;
+  actorName?: string;
+  actorColor?: string;
   onPointerDown: (e: React.PointerEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onPortClick: () => void;
@@ -27,8 +27,8 @@ export function NodeTile({
   connectSource,
   connectTarget,
   dragging,
-  partName,
-  partColor,
+  actorName,
+  actorColor,
   onPointerDown,
   onContextMenu,
   onPortClick,
@@ -81,13 +81,13 @@ export function NodeTile({
           {kind.label}
         </span>
         <span className="flex-1" />
-        {partName && (
+        {actorName && (
           <span className="flex min-w-0 items-center gap-1.5 text-[10.5px] text-[#d3d5e4]">
             <span
               className="size-1.5 shrink-0 rounded-full"
-              style={{ background: partColor ?? "#9b9bff" }}
+              style={{ background: actorColor ?? "#9b9bff" }}
             />
-            <span className="truncate">{partName}</span>
+            <span className="truncate">{actorName}</span>
           </span>
         )}
       </div>

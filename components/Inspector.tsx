@@ -16,7 +16,7 @@ import type {
   Step,
   StepKind,
 } from "@/lib/types";
-import { KIND_META, STEP_PALETTE, partColors, withAlpha } from "@/lib/meta";
+import { KIND_META, STEP_PALETTE, actorColors, withAlpha } from "@/lib/meta";
 import { type EdgeRef, type Selection } from "@/lib/graph";
 
 export interface EditorActions {
@@ -30,9 +30,9 @@ export interface EditorActions {
     ref: EdgeRef,
     patch: { color?: string | null; line?: EdgeLine | null }
   ) => void;
-  addPart: (name: string) => void;
-  updatePart: (id: string, patch: { name?: string; role?: string }) => void;
-  deletePart: (id: string) => void;
+  addActor: (name: string) => void;
+  updateActor: (id: string, patch: { name?: string; role?: string }) => void;
+  deleteActor: (id: string) => void;
   /** groupId, existing group id, or "__new__"; null removes membership. */
   assignGroup: (stepId: string, groupId: string | null) => void;
   updateGroup: (
@@ -206,20 +206,20 @@ function StepPanel({
         />
       </div>
 
-      <label className={labelCls} htmlFor="insp-part">
-        Moving part
+      <label className={labelCls} htmlFor="insp-actor">
+        Actor
       </label>
       <div className="relative">
         <select
-          id="insp-part"
+          id="insp-actor"
           className={selectCls}
-          value={step.part ?? ""}
+          value={step.actor ?? ""}
           onChange={(e) =>
-            actions.updateStep(step.id, { part: e.target.value || undefined })
+            actions.updateStep(step.id, { actor: e.target.value || undefined })
           }
         >
           <option value="">none</option>
-          {(doc.parts ?? []).map((p) => (
+          {(doc.actors ?? []).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
@@ -559,7 +559,7 @@ function DocPanel({
   doc: Explanation;
   actions: EditorActions;
 }) {
-  const colors = partColors(doc);
+  const colors = actorColors(doc);
 
   return (
     <div>
@@ -580,9 +580,9 @@ function DocPanel({
         }
       />
 
-      <span className={labelCls}>Moving parts</span>
+      <span className={labelCls}>Actors</span>
       <div className="space-y-1.5">
-        {(doc.parts ?? []).map((p) => (
+        {(doc.actors ?? []).map((p) => (
           <div key={p.id} className="flex items-center gap-2">
             <span
               className="size-2 shrink-0 rounded-full"
@@ -592,26 +592,26 @@ function DocPanel({
               }}
             />
             <input
-              aria-label="Part name"
+              aria-label="Actor name"
               className={`${miniInputCls} w-0 flex-1 text-[12.5px] font-medium`}
               value={p.name}
               onChange={(e) =>
-                actions.updatePart(p.id, { name: e.target.value })
+                actions.updateActor(p.id, { name: e.target.value })
               }
             />
             <input
-              aria-label="Part role"
+              aria-label="Actor role"
               className={`${miniInputCls} w-0 flex-[1.3] text-[12px]`}
               value={p.role ?? ""}
               placeholder="role…"
               onChange={(e) =>
-                actions.updatePart(p.id, { role: e.target.value })
+                actions.updateActor(p.id, { role: e.target.value })
               }
             />
             <button
               type="button"
-              aria-label={`Delete part ${p.name}`}
-              onClick={() => actions.deletePart(p.id)}
+              aria-label={`Delete actor ${p.name}`}
+              onClick={() => actions.deleteActor(p.id)}
               className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
             >
               <Trash2 size={12} />
@@ -620,11 +620,11 @@ function DocPanel({
         ))}
         <button
           type="button"
-          onClick={() => actions.addPart("New part")}
+          onClick={() => actions.addActor("New actor")}
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[11.5px] text-mute transition-colors hover:border-line-strong hover:text-text"
         >
           <Plus size={11} />
-          Add part
+          Add actor
         </button>
       </div>
 

@@ -691,35 +691,35 @@ export function Editor({ initial, initialCustom }: Props) {
       deleteEdge,
       updateEdgeLabel,
       updateEdgeStyle,
-      addPart: (name) => {
+      addActor: (name) => {
         const d = docRef.current;
         const base =
           name
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "") || "part";
+            .replace(/^-+|-+$/g, "") || "actor";
         let id = base;
         let n = 2;
-        while ((d.parts ?? []).some((p) => p.id === id)) id = `${base}-${n++}`;
-        commit({ ...d, parts: [...(d.parts ?? []), { id, name }] });
+        while ((d.actors ?? []).some((p) => p.id === id)) id = `${base}-${n++}`;
+        commit({ ...d, actors: [...(d.actors ?? []), { id, name }] });
       },
-      updatePart: (id, patch) => {
+      updateActor: (id, patch) => {
         const d = docRef.current;
         commit(
           {
             ...d,
-            parts: d.parts?.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+            actors: d.actors?.map((p) => (p.id === id ? { ...p, ...patch } : p)),
           },
-          `part:${id}:${Object.keys(patch).sort().join(",")}`
+          `actor:${id}:${Object.keys(patch).sort().join(",")}`
         );
       },
-      deletePart: (id) => {
+      deleteActor: (id) => {
         const d = docRef.current;
         commit({
           ...d,
-          parts: d.parts?.filter((p) => p.id !== id),
+          actors: d.actors?.filter((p) => p.id !== id),
           steps: d.steps.map((s) =>
-            s.part === id ? { ...s, part: undefined } : s
+            s.actor === id ? { ...s, actor: undefined } : s
           ),
         });
       },

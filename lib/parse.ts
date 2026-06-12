@@ -55,7 +55,12 @@ export function parseExplanation(raw: string): ParseResult {
       title: s.title.trim(),
       detail: typeof s.detail === "string" ? s.detail : undefined,
       kind,
-      part: typeof s.part === "string" ? s.part : undefined,
+      actor:
+        typeof s.actor === "string"
+          ? s.actor
+          : typeof s.part === "string"
+            ? s.part
+            : undefined,
       branches: Array.isArray(s.branches)
         ? s.branches
             .filter(
@@ -101,8 +106,13 @@ export function parseExplanation(raw: string): ParseResult {
         .filter((l) => ids.has(l.from) && ids.has(l.to))
     : undefined;
 
-  const parts = Array.isArray(obj.parts)
-    ? (obj.parts as Record<string, unknown>[])
+  const actorSource = Array.isArray(obj.actors)
+    ? obj.actors
+    : Array.isArray(obj.parts)
+      ? obj.parts
+      : undefined;
+  const actors = actorSource
+    ? (actorSource as Record<string, unknown>[])
         .filter((p) => typeof p?.id === "string" && typeof p?.name === "string")
         .map((p) => ({
           id: p.id as string,
@@ -142,7 +152,7 @@ export function parseExplanation(raw: string): ParseResult {
     data: {
       title: obj.title.trim(),
       summary: typeof obj.summary === "string" ? obj.summary : undefined,
-      parts,
+      actors,
       steps,
       loops,
       groups,

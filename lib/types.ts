@@ -2,10 +2,10 @@
 
 export type StepKind = "input" | "process" | "decision" | "output" | "wait";
 
-export interface Part {
+export interface Actor {
   id: string;
   name: string;
-  /** One short phrase: what this part is responsible for. */
+  /** One short phrase: what this actor is responsible for. */
   role?: string;
 }
 
@@ -29,8 +29,8 @@ export interface Step {
   /** One or two plain sentences explaining what happens and why. */
   detail?: string;
   kind?: StepKind;
-  /** Part id of the moving part performing this step. */
-  part?: string;
+  /** Actor id performing this step. */
+  actor?: string;
   /** Decision steps: where each condition leads. */
   branches?: Branch[];
   /** Explicit next step when flow does not continue to the following step. */
@@ -74,7 +74,7 @@ export interface Explanation {
   title: string;
   /** The essence in one sentence. */
   summary?: string;
-  parts?: Part[];
+  actors?: Actor[];
   steps: Step[];
   /** System-level feedback loops beyond step-to-step flow. */
   loops?: Loop[];

@@ -30,9 +30,9 @@ npm run dev   # http://localhost:4400
 - Click any edge or its label to edit it fully: label, line style
   (solid/dashed/dotted), and color — defaults follow semantics (feedback is
   dashed amber) but every edge can be styled freely.
-- Steps can be clustered into dashed group regions (`groups` in the JSON, or
-  the Group select in the inspector); each step can carry a custom color.
-- With nothing selected the inspector edits the summary, moving parts, and
+- Steps can be clustered into dashed group regions (`groups` in the JSON);
+  each step can carry a custom color.
+- With nothing selected the inspector edits the summary, actors, and
   groups. `Delete` removes the selection, `Esc` deselects.
 - Everything autosaves to `localStorage`; **JSON → Copy JSON** exports the
   current state, edits included.

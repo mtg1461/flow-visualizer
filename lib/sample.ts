@@ -4,7 +4,7 @@ export const SAMPLE: Explanation = {
   title: "How a coding agent ships a feature",
   summary:
     "A request becomes a plan, the plan becomes code, and a loop of tests and review keeps rewriting that code until both the machine and the human say yes.",
-  parts: [
+  actors: [
     { id: "user", name: "You", role: "asks and approves" },
     { id: "agent", name: "Agent", role: "reads, plans, writes" },
     { id: "codebase", name: "Codebase", role: "the ground truth" },
@@ -17,7 +17,7 @@ export const SAMPLE: Explanation = {
       detail:
         "One or two sentences of intent. Everything downstream is the agent translating this into working code.",
       kind: "input",
-      part: "user",
+      actor: "user",
     },
     {
       id: "explore",
@@ -25,7 +25,7 @@ export const SAMPLE: Explanation = {
       detail:
         "Search, open files, follow imports. The goal is a mental model: where the change belongs and what it might break.",
       kind: "process",
-      part: "agent",
+      actor: "agent",
     },
     {
       id: "plan",
@@ -33,7 +33,7 @@ export const SAMPLE: Explanation = {
       detail:
         "Which files to touch, in what order, and what could go wrong. Cheap to fix here, expensive to fix later.",
       kind: "process",
-      part: "agent",
+      actor: "agent",
     },
     {
       id: "edit",
@@ -41,7 +41,7 @@ export const SAMPLE: Explanation = {
       detail:
         "The plan turns into edits. Small, reviewable changes that match the style of the code around them.",
       kind: "process",
-      part: "agent",
+      actor: "agent",
     },
     {
       id: "test",
@@ -49,13 +49,13 @@ export const SAMPLE: Explanation = {
       detail:
         "Compile, lint, unit tests. The machine gets the first vote on whether the change is real progress.",
       kind: "process",
-      part: "tests",
+      actor: "tests",
     },
     {
       id: "verdict",
       title: "Do the tests pass?",
       kind: "decision",
-      part: "tests",
+      actor: "tests",
       branches: [
         { when: "all green", to: "review" },
         { when: "something fails", to: "diagnose" },
@@ -67,14 +67,14 @@ export const SAMPLE: Explanation = {
       detail:
         "Read the failing output, form a hypothesis, and go back to the code with a sharper idea of what is wrong.",
       kind: "process",
-      part: "agent",
+      actor: "agent",
       then: "edit",
     },
     {
       id: "review",
       title: "Does the human approve?",
       kind: "decision",
-      part: "user",
+      actor: "user",
       branches: [
         { when: "looks right", to: "ship" },
         { when: "changes requested", to: "edit" },
@@ -86,7 +86,7 @@ export const SAMPLE: Explanation = {
       detail:
         "Committed, merged, done. The feature exists now — and so does its weight on every future change.",
       kind: "output",
-      part: "codebase",
+      actor: "codebase",
     },
   ],
   loops: [

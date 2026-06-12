@@ -5,7 +5,7 @@ Schema (TypeScript):
 interface Explanation {
   title: string;            // "How X works", under ~70 chars
   summary?: string;         // the essence in one sentence
-  parts?: {                 // the moving parts involved
+  actors?: {                // the actors involved
     id: string;
     name: string;
     role?: string;          // short phrase: what it is responsible for
@@ -15,7 +15,7 @@ interface Explanation {
     title: string;          // headline under ~60 chars, plain language
     detail?: string;        // 1–2 sentences: what happens and WHY it matters
     kind?: "input" | "process" | "decision" | "output" | "wait";
-    part?: string;          // id of the part performing this step
+    actor?: string;         // id of the actor performing this step
     branches?: {            // decision steps only: where each condition leads
       when: string;         // plain-language condition, e.g. "cache hit"
       to: string;           // target step id (earlier id = a retry/loop)
