@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { EdgeLine, Explanation, Step } from "@/lib/types";
-import { parseExplanation } from "@/lib/parse";
 import {
   GRID_LIMITS,
   type EdgeRef,
@@ -10,12 +9,10 @@ import {
   type Selection,
   cellInRect,
   groupCellRect,
-  denormalize,
   layoutPositions,
   nearestFreeCell,
   normalize,
   rectsOverlap,
-  resolveGroupConflicts,
   tidyLayout,
   type CellRect,
 } from "@/lib/graph";
@@ -23,159 +20,20 @@ import { Canvas } from "./Canvas";
 import { ContextMenu, type MenuState } from "./ContextMenu";
 import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
-import {
-  ConnectionScreen,
-  type ConnectionPreview,
-  type FileSyncStatus,
-} from "./ConnectionScreen";
+import { ConnectionScreen } from "./ConnectionScreen";
 import { DisconnectDialog } from "./DisconnectDialog";
 import { SCHEMA_PROMPT } from "@/lib/prompt";
-
-export const STORAGE_KEY = "unfold:data";
-
-const HISTORY_LIMIT = 100;
-/** Edits with the same coalesce key inside this window share one undo entry. */
-const COALESCE_MS = 1000;
+import { useEditorHistory } from "@/hooks/useEditorHistory";
+import { useFileConnection } from "@/hooks/useFileConnection";
 
 interface Props {
   initial: Explanation;
 }
 
-interface LocalFileRead {
-  path: string;
-  contents: string;
-  mtimeMs: number;
-  size: number;
-}
-
-interface LocalFileStat {
-  path: string;
-  mtimeMs: number;
-  size: number;
-}
-
-interface BrowserWritable {
-  write: (contents: string) => Promise<void>;
-  close: () => Promise<void>;
-}
-
-interface BrowserFileHandle {
-  kind?: string;
-  name: string;
-  getFile: () => Promise<File>;
-  queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
-  requestPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
-  createWritable?: () => Promise<BrowserWritable>;
-}
-
-interface BrowserFileConnection {
-  name: string;
-  lastModified: number;
-  size: number;
-  handle: BrowserFileHandle;
-}
-
-type PendingConnection =
-  | (LocalFileRead & {
-      kind: "path";
-      preview: Explanation;
-      normalized: Explanation;
-      sourceName: string;
-    })
-  | {
-      kind: "browser";
-      preview: Explanation;
-      normalized: Explanation;
-      sourceName: string;
-      lastModified: number;
-      size: number;
-      handle: BrowserFileHandle;
-    };
-
-declare global {
-  interface Window {
-    showOpenFilePicker?: (options?: unknown) => Promise<BrowserFileHandle[]>;
-  }
-
-  interface DataTransferItem {
-    getAsFileSystemHandle?: () => Promise<BrowserFileHandle | { kind?: string }>;
-  }
-}
-
-function singleDroppedPath(text: string) {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length > 1)
-    throw new Error("Connect one JSON file at a time.");
-  return lines[0] ?? "";
-}
-
-function persist(doc: Explanation | null) {
-  try {
-    if (doc) localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // storage unavailable — edits still live for this session
-  }
-}
-
-function serializeDoc(doc: Explanation) {
-  return JSON.stringify(denormalize(doc), null, 2);
-}
-
-async function postFileApi<T>(
-  endpoint: "read" | "stat" | "write",
-  body: { path: string; contents?: string }
-): Promise<T> {
-  const response = await fetch(`/api/file/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-    body: JSON.stringify(body),
-  });
-  const data = await response.json();
-  if (!response.ok)
-    throw new Error(
-      typeof data?.error === "string" ? data.error : "File operation failed."
-    );
-  return data as T;
-}
-
-function isBrowserFileHandle(handle: unknown): handle is BrowserFileHandle {
-  return (
-    typeof handle === "object" &&
-    handle !== null &&
-    typeof (handle as BrowserFileHandle).name === "string" &&
-    typeof (handle as BrowserFileHandle).getFile === "function"
-  );
-}
-
-function toConnectionPreview(
-  sourceName: string,
-  doc: Explanation,
-  canRequestWrite: boolean
-): ConnectionPreview {
-  return {
-    sourceName,
-    title: doc.title,
-    summary: doc.summary,
-    stepCount: doc.steps.length,
-    actorCount: doc.actors?.length ?? 0,
-    groupCount: doc.groups?.length ?? 0,
-    canRequestWrite,
-  };
-}
-
 /**
- * Canvas ruleset, rule 2: groups anchor their members. A tile inside a
- * group must never move because something OUTSIDE the group changed —
- * auto-layout positions tiles relative to their predecessors, so without
- * this, dragging a connected outside tile reflows unpinned members and
- * stretches the group. Every commit pins unpinned members at the cell
- * they occupied before the mutation. Tidy and JSON-apply bypass this on
- * purpose: they are the explicit "re-layout everything" actions.
+ * Groups anchor their members. A tile inside a group must never move because
+ * something outside that group changed. Explicit re-layout and file-load
+ * operations opt out by calling commit with stabilization disabled.
  */
 function stabilizeGroupMembers(
   next: Explanation,
@@ -230,90 +88,49 @@ function validSelection(
 }
 
 export function Editor({ initial }: Props) {
-  const [doc, setDocState] = useState<Explanation>(() => normalize(initial));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [promptCopied, setPromptCopied] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
-  const [filePath, setFilePath] = useState("");
-  const [pendingConnection, setPendingConnection] =
-    useState<PendingConnection | null>(null);
-  const [boundFile, setBoundFile] = useState<LocalFileStat | null>(null);
-  const [browserFile, setBrowserFile] =
-    useState<BrowserFileConnection | null>(null);
-  const [fileStatus, setFileStatus] = useState<FileSyncStatus>("idle");
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [canUndo, setCanUndo] = useState(false);
   const [fitSignal, setFitSignal] = useState(0);
 
-  const docRef = useRef(doc);
-  docRef.current = doc;
-  const past = useRef<Explanation[]>([]);
-  const future = useRef<Explanation[]>([]);
-  const lastCommit = useRef({ key: "", at: 0 });
-  const lastFileJson = useRef(serializeDoc(doc));
-  const saveTimer = useRef<number | null>(null);
-  const readingFile = useRef(false);
-
-  const commit = useCallback(
-    (next: Explanation, coalesceKey?: string, stabilize = true) => {
-      if (stabilize)
-        next = stabilizeGroupMembers(next, layoutPositions(docRef.current));
-      const now = Date.now();
-      const merge =
-        !!coalesceKey &&
-        coalesceKey === lastCommit.current.key &&
-        now - lastCommit.current.at < COALESCE_MS;
-      if (!merge) {
-        past.current.push(docRef.current);
-        if (past.current.length > HISTORY_LIMIT) past.current.shift();
-      }
-      lastCommit.current = { key: coalesceKey ?? "", at: now };
-      future.current = [];
-      setCanUndo(true);
-      setDocState(next);
-      persist(next);
-    },
-    []
-  );
-
-  const undo = useCallback(() => {
-    const prev = past.current.pop();
-    if (!prev) return;
-    future.current.push(docRef.current);
-    lastCommit.current = { key: "", at: 0 };
-    setCanUndo(past.current.length > 0);
-    setDocState(prev);
-    persist(prev);
-    setSelection((s) => validSelection(prev, s));
+  const onRestore = useCallback((restored: Explanation) => {
+    setSelection((s) => validSelection(restored, s));
     setConnectFrom(null);
   }, []);
 
-  const redo = useCallback(() => {
-    const next = future.current.pop();
-    if (!next) return;
-    past.current.push(docRef.current);
-    lastCommit.current = { key: "", at: 0 };
-    setCanUndo(true);
-    setDocState(next);
-    persist(next);
-    setSelection((s) => validSelection(next, s));
-    setConnectFrom(null);
+  const stabilizeDoc = useCallback((next: Explanation, previous: Explanation) => {
+    return stabilizeGroupMembers(next, layoutPositions(previous));
   }, []);
+
+  const { doc, docRef, commit, undo, redo, canUndo } = useEditorHistory({
+    initial: normalize(initial),
+    stabilize: stabilizeDoc,
+    onRestore,
+  });
+
+  const onFileConnected = useCallback(() => {
+    setSelection(null);
+    setConnectFrom(null);
+    setFitSignal((s) => s + 1);
+  }, []);
+
+  const onFileDisconnected = useCallback(() => {
+    setSelection(null);
+    setConnectFrom(null);
+    setMenu(null);
+    setDisconnectOpen(false);
+  }, []);
+
+  const fileConnection = useFileConnection({
+    doc,
+    commit,
+    onConnected: onFileConnected,
+    onDisconnected: onFileDisconnected,
+  });
 
   const positions = useMemo(() => layoutPositions(doc), [doc]);
-  const connected = !!boundFile || !!browserFile;
-  const connectionName = boundFile?.path ?? browserFile?.name ?? "";
-  const preview = pendingConnection
-    ? toConnectionPreview(
-        pendingConnection.sourceName,
-        pendingConnection.preview,
-        pendingConnection.kind === "browser" &&
-          !!pendingConnection.handle.requestPermission
-      )
-    : null;
 
   /* ------------------------------------------------------- mutations */
 
@@ -807,418 +624,15 @@ export function Editor({ initial }: Props) {
     setFitSignal((s) => s + 1);
   }, [commit]);
 
-  const settleFileStatus = useCallback((status: FileSyncStatus) => {
-    setFileStatus(status);
-    if (status === "saved" || status === "external") {
-      window.setTimeout(() => {
-        setFileStatus((current) =>
-          current === status ? "watching" : current
-        );
-      }, 1300);
-    }
-  }, []);
-
-  const previewPath = useCallback(async (path: string) => {
-    const wanted = path.trim();
-    if (!wanted) {
-      setPendingConnection(null);
-      setFileError(null);
-      setFileStatus("idle");
-      return;
-    }
-    setFileError(null);
-    setFileStatus("loading");
-    try {
-      const data = await postFileApi<LocalFileRead>("read", { path: wanted });
-      const result = parseExplanation(data.contents);
-      if (!result.ok) throw new Error(result.error);
-      const normalized = resolveGroupConflicts(normalize(result.data));
-      setPendingConnection({
-        ...data,
-        kind: "path",
-        preview: result.data,
-        normalized,
-        sourceName: data.path,
-      });
-      setFileStatus("watching");
-    } catch (error) {
-      setPendingConnection(null);
-      setFileError(error instanceof Error ? error.message : "Could not preview file.");
-      setFileStatus("error");
-    }
-  }, []);
-
-  const previewBrowserHandle = useCallback(async (handle: BrowserFileHandle) => {
-    if (handle.kind && handle.kind !== "file") {
-      setPendingConnection(null);
-      setFileError("Drop or browse to a JSON file.");
-      setFileStatus("error");
-      return;
-    }
-    setFileError(null);
-    setFileStatus("loading");
-    try {
-      const file = await handle.getFile();
-      const result = parseExplanation(await file.text());
-      if (!result.ok) throw new Error(result.error);
-      const normalized = resolveGroupConflicts(normalize(result.data));
-      setPendingConnection({
-        kind: "browser",
-        preview: result.data,
-        normalized,
-        sourceName: handle.name || file.name || "flow.json",
-        lastModified: file.lastModified,
-        size: file.size,
-        handle,
-      });
-      setFileStatus("watching");
-    } catch (error) {
-      setPendingConnection(null);
-      setFileError(error instanceof Error ? error.message : "Could not preview file.");
-      setFileStatus("error");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (connected) return;
-    const wanted = filePath.trim();
-    if (!wanted) {
-      setPendingConnection((current) =>
-        current?.kind === "path" ? null : current
-      );
-      setFileError(null);
-      setFileStatus("idle");
-      return;
-    }
-    const id = window.setTimeout(() => previewPath(wanted), 450);
-    return () => window.clearTimeout(id);
-  }, [connected, filePath, previewPath]);
-
-  const loadFile = useCallback(
-    async (path = filePath, source: "manual" | "watch" = "manual") => {
-      const wanted = path.trim();
-      if (!wanted) {
-        setFileError("Enter a local JSON file path.");
-        setFileStatus("error");
-        return;
-      }
-      readingFile.current = true;
-      setFileError(null);
-      setFileStatus(source === "watch" ? "external" : "loading");
-      try {
-        const data = await postFileApi<LocalFileRead>("read", { path: wanted });
-        const result = parseExplanation(data.contents);
-        if (!result.ok) throw new Error(result.error);
-        const next = resolveGroupConflicts(normalize(result.data));
-        lastFileJson.current = serializeDoc(next);
-        setFilePath(data.path);
-        setBoundFile({
-          path: data.path,
-          mtimeMs: data.mtimeMs,
-          size: data.size,
-        });
-        setBrowserFile(null);
-        setLastSyncedAt(Date.now());
-        commit(next, undefined, false);
-        setSelection(null);
-        setConnectFrom(null);
-        setFitSignal((s) => s + 1);
-        settleFileStatus(source === "watch" ? "external" : "watching");
-      } catch (error) {
-        setFileError(error instanceof Error ? error.message : "Could not open file.");
-        setFileStatus("error");
-      } finally {
-        window.setTimeout(() => {
-          readingFile.current = false;
-        }, 0);
-      }
-    },
-    [commit, filePath, settleFileStatus]
-  );
-
-  const connectBrowserHandle = useCallback(
-    async (
-      handle: BrowserFileHandle,
-      source: "manual" | "watch" = "manual"
-    ) => {
-      if (handle.kind && handle.kind !== "file") {
-        setFileError("Drop or browse to a JSON file.");
-        setFileStatus("error");
-        return;
-      }
-      readingFile.current = true;
-      setFileError(null);
-      setFileStatus(source === "watch" ? "external" : "loading");
-      try {
-        const file = await handle.getFile();
-        const result = parseExplanation(await file.text());
-        if (!result.ok) throw new Error(result.error);
-        const next = resolveGroupConflicts(normalize(result.data));
-        lastFileJson.current = serializeDoc(next);
-        setBoundFile(null);
-        setBrowserFile({
-          name: handle.name || file.name || "flow.json",
-          lastModified: file.lastModified,
-          size: file.size,
-          handle,
-        });
-        setLastSyncedAt(Date.now());
-        commit(next, undefined, false);
-        setSelection(null);
-        setConnectFrom(null);
-        setFitSignal((s) => s + 1);
-        settleFileStatus(source === "watch" ? "external" : "watching");
-      } catch (error) {
-        setFileError(error instanceof Error ? error.message : "Could not open file.");
-        setFileStatus("error");
-      } finally {
-        window.setTimeout(() => {
-          readingFile.current = false;
-        }, 0);
-      }
-    },
-    [commit, settleFileStatus]
-  );
-
-  const browseFile = useCallback(async () => {
-    if (!window.showOpenFilePicker) {
-      setFileError("Browse needs browser file access. Paste a local path instead.");
-      setFileStatus("error");
-      return;
-    }
-    try {
-      const handles = await window.showOpenFilePicker({
-        multiple: false,
-        types: [
-          {
-            description: "JSON files",
-            accept: { "application/json": [".json"] },
-          },
-        ],
-      });
-      if (handles.length !== 1)
-        throw new Error("Connect one JSON file at a time.");
-      const [handle] = handles;
-      if (handle) {
-        setFilePath("");
-        await previewBrowserHandle(handle);
-      }
-    } catch (error) {
-      const name = error instanceof Error ? error.name : "";
-      if (name !== "AbortError") {
-        setFileError(error instanceof Error ? error.message : "Could not browse file.");
-        setFileStatus("error");
-      }
-    }
-  }, [previewBrowserHandle]);
-
-  const connectDropped = useCallback(
-    async (dataTransfer: DataTransfer) => {
-      const fileItems = [...dataTransfer.items].filter(
-        (x) => x.kind === "file"
-      );
-      if (dataTransfer.files.length > 1 || fileItems.length > 1) {
-        setPendingConnection(null);
-        setFileError("Connect one JSON file at a time.");
-        setFileStatus("error");
-        return;
-      }
-      let text = "";
-      try {
-        text = singleDroppedPath(dataTransfer.getData("text/plain"));
-      } catch (error) {
-        setPendingConnection(null);
-        setFileError(error instanceof Error ? error.message : "Connect one JSON file at a time.");
-        setFileStatus("error");
-        return;
-      }
-      if (text && (text.endsWith(".json") || text.includes("\\") || text.includes("/"))) {
-        setFilePath(text);
-        await previewPath(text);
-        return;
-      }
-      const item = fileItems[0];
-      const handle = item?.getAsFileSystemHandle
-        ? await item.getAsFileSystemHandle()
-        : null;
-      if (isBrowserFileHandle(handle)) {
-        setFilePath("");
-        await previewBrowserHandle(handle);
-        return;
-      }
-      setFileError("Drop a JSON file with browser file access, or paste its path.");
-      setFileStatus("error");
-    },
-    [previewBrowserHandle, previewPath]
-  );
-
-  const requestBrowserWrite = useCallback(async (handle: BrowserFileHandle) => {
-    if (handle.requestPermission) {
-      const permission = await handle.requestPermission({ mode: "readwrite" });
-      if (permission !== "granted")
-        throw new Error("Write permission was not granted for this file.");
-      return;
-    }
-    if (!handle.createWritable)
-      throw new Error("This browser did not provide write access for the selected file.");
-  }, []);
-
-  const connectPending = useCallback(async () => {
-    if (!pendingConnection) return;
-    setFileError(null);
-    setFileStatus("loading");
-    try {
-      const next = pendingConnection.normalized;
-      lastFileJson.current = serializeDoc(next);
-      if (pendingConnection.kind === "path") {
-        setBoundFile({
-          path: pendingConnection.path,
-          mtimeMs: pendingConnection.mtimeMs,
-          size: pendingConnection.size,
-        });
-        setBrowserFile(null);
-      } else {
-        await requestBrowserWrite(pendingConnection.handle);
-        setBoundFile(null);
-        setBrowserFile({
-          name: pendingConnection.sourceName,
-          lastModified: pendingConnection.lastModified,
-          size: pendingConnection.size,
-          handle: pendingConnection.handle,
-        });
-      }
-      setPendingConnection(null);
-      setLastSyncedAt(Date.now());
-      commit(next, undefined, false);
-      setSelection(null);
-      setConnectFrom(null);
-      setFitSignal((s) => s + 1);
-      settleFileStatus("watching");
-    } catch (error) {
-      setFileError(error instanceof Error ? error.message : "Could not connect file.");
-      setFileStatus("error");
-    }
-  }, [commit, pendingConnection, requestBrowserWrite, settleFileStatus]);
-
-  useEffect(() => {
-    if ((!boundFile && !browserFile) || readingFile.current) return;
-    const contents = serializeDoc(doc);
-    if (contents === lastFileJson.current) return;
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    setFileStatus("saving");
-    saveTimer.current = window.setTimeout(async () => {
-      saveTimer.current = null;
-      try {
-        if (boundFile) {
-          const data = await postFileApi<LocalFileStat>("write", {
-            path: boundFile.path,
-            contents,
-          });
-          setBoundFile(data);
-        } else if (browserFile?.handle.createWritable) {
-          const writable = await browserFile.handle.createWritable();
-          await writable.write(contents.endsWith("\n") ? contents : `${contents}\n`);
-          await writable.close();
-          const file = await browserFile.handle.getFile();
-          setBrowserFile({
-            ...browserFile,
-            lastModified: file.lastModified,
-            size: file.size,
-          });
-        } else {
-          throw new Error("This connection cannot write back. Paste a local path instead.");
-        }
-        lastFileJson.current = contents;
-        setLastSyncedAt(Date.now());
-        setFileError(null);
-        settleFileStatus("saved");
-      } catch (error) {
-        setFileError(error instanceof Error ? error.message : "Could not save file.");
-        setFileStatus("error");
-      }
-    }, 700);
-    return () => {
-      if (saveTimer.current) {
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = null;
-      }
-    };
-  }, [boundFile, browserFile, doc, settleFileStatus]);
-
-  useEffect(() => {
-    if (!boundFile) return;
-    let alive = true;
-    const poll = async () => {
-      if (readingFile.current || saveTimer.current) return;
-      try {
-        const data = await postFileApi<LocalFileStat>("stat", {
-          path: boundFile.path,
-        });
-        if (!alive) return;
-        if (Math.abs(data.mtimeMs - boundFile.mtimeMs) > 1)
-          await loadFile(boundFile.path, "watch");
-      } catch (error) {
-        if (!alive) return;
-        setFileError(error instanceof Error ? error.message : "Could not watch file.");
-        setFileStatus("error");
-      }
-    };
-    const id = window.setInterval(poll, 1400);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, [boundFile, loadFile]);
-
-  useEffect(() => {
-    if (!browserFile) return;
-    let alive = true;
-    const poll = async () => {
-      if (readingFile.current || saveTimer.current) return;
-      try {
-        const file = await browserFile.handle.getFile();
-        if (!alive) return;
-        if (Math.abs(file.lastModified - browserFile.lastModified) > 1)
-          await connectBrowserHandle(browserFile.handle, "watch");
-      } catch (error) {
-        if (!alive) return;
-        setFileError(error instanceof Error ? error.message : "Could not watch file.");
-        setFileStatus("error");
-      }
-    };
-    const id = window.setInterval(poll, 1400);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, [browserFile, connectBrowserHandle]);
-
-  const disconnect = useCallback(() => {
-    if (saveTimer.current) {
-      window.clearTimeout(saveTimer.current);
-      saveTimer.current = null;
-    }
-    setBoundFile(null);
-    setBrowserFile(null);
-    setFileStatus("idle");
-    setFileError(null);
-    setLastSyncedAt(null);
-    setSelection(null);
-    setConnectFrom(null);
-    setMenu(null);
-    setDisconnectOpen(false);
-  }, []);
-
   const copyPrompt = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(SCHEMA_PROMPT);
       setPromptCopied(true);
       window.setTimeout(() => setPromptCopied(false), 1600);
     } catch {
-      setFileError("Could not copy the prompt.");
-      setFileStatus("error");
+      fileConnection.reportError("Could not copy the prompt.");
     }
-  }, []);
+  }, [fileConnection]);
 
   const actions: EditorActions = useMemo(
     () => ({
@@ -1353,26 +767,18 @@ export function Editor({ initial }: Props) {
 
   /* ---------------------------------------------------------- render */
 
-  if (!connected) {
+  if (!fileConnection.connected) {
     return (
       <ConnectionScreen
-        path={filePath}
-        status={fileStatus}
-        error={fileError}
-        preview={preview}
-        onPathChange={(path) => {
-          setFilePath(path);
-          setFileError(null);
-        }}
-        onConnectPreview={connectPending}
-        onClearPreview={() => {
-          setFilePath("");
-          setPendingConnection(null);
-          setFileError(null);
-          setFileStatus("idle");
-        }}
-        onBrowse={browseFile}
-        onDropConnection={connectDropped}
+        path={fileConnection.path}
+        status={fileConnection.status}
+        error={fileConnection.error}
+        preview={fileConnection.preview}
+        onPathChange={fileConnection.setPath}
+        onConnectPreview={fileConnection.connectPending}
+        onClearPreview={fileConnection.clearPreview}
+        onBrowse={fileConnection.browseFile}
+        onDropConnection={fileConnection.connectDropped}
       />
     );
   }
@@ -1381,8 +787,8 @@ export function Editor({ initial }: Props) {
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <Toolbar
         title={doc.title}
-        connectionName={connectionName}
-        status={fileStatus}
+        connectionName={fileConnection.connectionName}
+        status={fileConnection.status}
         canUndo={canUndo}
         onUndo={undo}
         onTidy={tidy}
@@ -1439,9 +845,9 @@ export function Editor({ initial }: Props) {
       </div>
       <DisconnectDialog
         open={disconnectOpen}
-        connectionName={connectionName}
+        connectionName={fileConnection.connectionName}
         onCancel={() => setDisconnectOpen(false)}
-        onConfirm={disconnect}
+        onConfirm={fileConnection.disconnect}
       />
     </div>
   );

@@ -235,7 +235,7 @@ export function Canvas({
   // keep the flow fitted while the user hasn't taken control of the view
   const userMovedView = useRef(false);
 
-  // explicit fit requests (Tidy, JSON apply) override user view control
+  // Explicit fit requests from tidy/file loads override user view control.
   const fitRef = useRef(fit);
   fitRef.current = fit;
   useEffect(() => {

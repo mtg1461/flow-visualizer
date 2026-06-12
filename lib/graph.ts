@@ -376,7 +376,7 @@ export function tidyLayout(doc: Explanation): Explanation {
 }
 
 /**
- * Conflict-resolution passes shared by Tidy and JSON import: separates
+ * Conflict-resolution passes shared by tidy and file load: separates
  * overlapping groups, evicts non-members from group footprints, and parks
  * colliding empty regions. Leaves existing pins alone.
  */

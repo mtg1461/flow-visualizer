@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import type { Explanation } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
 import { parseExplanation } from "@/lib/parse";
-import { Editor, STORAGE_KEY } from "@/components/Editor";
+import { Editor } from "@/components/Editor";
+import { STORAGE_KEY } from "@/hooks/useEditorHistory";
 
 export default function Home() {
   const [initial, setInitial] = useState<Explanation | null>(null);
