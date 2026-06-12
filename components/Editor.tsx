@@ -22,7 +22,7 @@ import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
 import { ConnectionScreen } from "./ConnectionScreen";
 import { DisconnectDialog } from "./DisconnectDialog";
-import { SCHEMA_PROMPT } from "@/lib/prompt";
+import { AgentPromptDialog } from "./AgentPromptDialog";
 import { useEditorHistory } from "@/hooks/useEditorHistory";
 import { useFileConnection } from "@/hooks/useFileConnection";
 
@@ -90,7 +90,7 @@ function validSelection(
 export function Editor({ initial }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
-  const [promptCopied, setPromptCopied] = useState(false);
+  const [agentPromptOpen, setAgentPromptOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [fitSignal, setFitSignal] = useState(0);
@@ -624,16 +624,6 @@ export function Editor({ initial }: Props) {
     setFitSignal((s) => s + 1);
   }, [commit]);
 
-  const copyPrompt = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(SCHEMA_PROMPT);
-      setPromptCopied(true);
-      window.setTimeout(() => setPromptCopied(false), 1600);
-    } catch {
-      fileConnection.reportError("Could not copy the prompt.");
-    }
-  }, [fileConnection]);
-
   const actions: EditorActions = useMemo(
     () => ({
       updateDoc: (patch) =>
@@ -769,17 +759,24 @@ export function Editor({ initial }: Props) {
 
   if (!fileConnection.connected) {
     return (
-      <ConnectionScreen
-        path={fileConnection.path}
-        status={fileConnection.status}
-        error={fileConnection.error}
-        preview={fileConnection.preview}
-        onPathChange={fileConnection.setPath}
-        onConnectPreview={fileConnection.connectPending}
-        onClearPreview={fileConnection.clearPreview}
-        onBrowse={fileConnection.browseFile}
-        onDropConnection={fileConnection.connectDropped}
-      />
+      <>
+        <ConnectionScreen
+          path={fileConnection.path}
+          status={fileConnection.status}
+          error={fileConnection.error}
+          preview={fileConnection.preview}
+          onPathChange={fileConnection.setPath}
+          onConnectPreview={fileConnection.connectPending}
+          onClearPreview={fileConnection.clearPreview}
+          onBrowse={fileConnection.browseFile}
+          onDropConnection={fileConnection.connectDropped}
+          onAgentPrompt={() => setAgentPromptOpen(true)}
+        />
+        <AgentPromptDialog
+          open={agentPromptOpen}
+          onClose={() => setAgentPromptOpen(false)}
+        />
+      </>
     );
   }
 
@@ -793,8 +790,7 @@ export function Editor({ initial }: Props) {
         onUndo={undo}
         onTidy={tidy}
         onTitle={(title) => commit({ ...doc, title }, "doc:title")}
-        onCopyPrompt={copyPrompt}
-        promptCopied={promptCopied}
+        onAgentPrompt={() => setAgentPromptOpen(true)}
         onDisconnect={() => setDisconnectOpen(true)}
       />
       <div className="relative min-h-0 flex-1">
@@ -848,6 +844,10 @@ export function Editor({ initial }: Props) {
         connectionName={fileConnection.connectionName}
         onCancel={() => setDisconnectOpen(false)}
         onConfirm={fileConnection.disconnect}
+      />
+      <AgentPromptDialog
+        open={agentPromptOpen}
+        onClose={() => setAgentPromptOpen(false)}
       />
     </div>
   );

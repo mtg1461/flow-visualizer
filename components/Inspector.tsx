@@ -565,36 +565,7 @@ function DocPanel({
 
   return (
     <div>
-      <div className="rounded-xl border border-line bg-surface p-3">
-        <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
-          Explanation
-        </span>
-        <h2 className="mt-1 text-[15px] font-semibold leading-snug text-text">
-          {doc.title || "Untitled flow"}
-        </h2>
-        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[10.5px] text-faint">
-          <div className="rounded-md border border-line bg-well px-1.5 py-2">
-            <div className="text-[14px] font-semibold text-text">
-              {doc.steps.length}
-            </div>
-            steps
-          </div>
-          <div className="rounded-md border border-line bg-well px-1.5 py-2">
-            <div className="text-[14px] font-semibold text-text">
-              {actors.length}
-            </div>
-            actors
-          </div>
-          <div className="rounded-md border border-line bg-well px-1.5 py-2">
-            <div className="text-[14px] font-semibold text-text">
-              {groups.length}
-            </div>
-            groups
-          </div>
-        </div>
-      </div>
-
-      <label className={labelCls} htmlFor="insp-summary">
+      <label className={`${labelCls} mt-0`} htmlFor="insp-summary">
         Summary
       </label>
       <textarea
@@ -620,15 +591,15 @@ function DocPanel({
           Add
         </button>
       </div>
-      <div className="mt-2 space-y-2">
+      <div className="mt-2 space-y-1.5">
         {actors.map((p) => (
           <div
             key={p.id}
-            className="rounded-lg border border-line bg-surface p-2.5"
+            className="rounded-lg border border-line bg-surface p-2"
           >
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
               <span
-                className="size-2.5 shrink-0 rounded-full"
+                className="size-2.5 rounded-full"
                 style={{
                   background: colors.get(p.id),
                   boxShadow: `0 0 7px ${colors.get(p.id)}66`,
@@ -636,7 +607,7 @@ function DocPanel({
               />
               <input
                 aria-label="Actor name"
-                className={`${miniInputCls} min-w-0 flex-1 text-[12.5px] font-medium`}
+                className={`${miniInputCls} min-w-0 text-[12.5px] font-medium`}
                 value={p.name}
                 onChange={(e) =>
                   actions.updateActor(p.id, { name: e.target.value })
@@ -653,7 +624,7 @@ function DocPanel({
             </div>
             <input
               aria-label="Actor role"
-              className={`${miniInputCls} mt-2 w-full text-[12px]`}
+              className={`${miniInputCls} mt-1.5 w-full text-[11.5px]`}
               value={p.role ?? ""}
               placeholder="role..."
               onChange={(e) =>

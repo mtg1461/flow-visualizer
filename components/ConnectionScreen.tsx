@@ -4,6 +4,7 @@ import { useState, type DragEvent } from "react";
 import {
   CircleAlert,
   ArrowLeft,
+  Bot,
   FileJson,
   FolderOpen,
   Link2,
@@ -21,11 +22,6 @@ export type FileSyncStatus =
 
 export interface ConnectionPreview {
   sourceName: string;
-  title: string;
-  summary?: string;
-  stepCount: number;
-  actorCount: number;
-  groupCount: number;
   canRequestWrite: boolean;
 }
 
@@ -39,6 +35,7 @@ interface Props {
   onClearPreview: () => void;
   onBrowse: () => void;
   onDropConnection: (dataTransfer: DataTransfer) => void;
+  onAgentPrompt: () => void;
 }
 
 const EXAMPLE_PATH = "examples\\live-flow.json";
@@ -53,6 +50,7 @@ export function ConnectionScreen({
   onClearPreview,
   onBrowse,
   onDropConnection,
+  onAgentPrompt,
 }: Props) {
   const [over, setOver] = useState(false);
   const busy = status === "loading";
@@ -67,53 +65,34 @@ export function ConnectionScreen({
     return (
       <main className="flex h-dvh items-center justify-center bg-bg p-5">
         <section className="anim-pop w-full max-w-[720px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
-          <button
-            type="button"
-            onClick={onClearPreview}
-            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-colors hover:border-line-strong hover:text-text"
-          >
-            <ArrowLeft size={13} />
-            Choose another
-          </button>
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onClearPreview}
+              className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-colors hover:border-line-strong hover:text-text"
+            >
+              <ArrowLeft size={13} />
+              Choose another
+            </button>
+            <button
+              type="button"
+              onClick={onAgentPrompt}
+              className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
+            >
+              <Bot size={13} />
+              Agent Prompt
+            </button>
+          </div>
 
           <div className="mt-5 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
               <FileJson size={18} />
             </div>
             <div className="min-w-0">
+              <h1 className="text-[18px] font-semibold">Ready to connect</h1>
               <p className="truncate font-mono text-[11.5px] text-faint">
                 {preview.sourceName}
               </p>
-              <h1 className="mt-0.5 text-[18px] font-semibold">
-                {preview.title}
-              </h1>
-            </div>
-          </div>
-
-          {preview.summary && (
-            <p className="mt-4 rounded-xl border border-line bg-surface p-4 text-[13px] leading-relaxed text-mute">
-              {preview.summary}
-            </p>
-          )}
-
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[12px] text-mute">
-            <div className="rounded-lg border border-line bg-surface p-3">
-              <div className="text-[18px] font-semibold text-text">
-                {preview.stepCount}
-              </div>
-              steps
-            </div>
-            <div className="rounded-lg border border-line bg-surface p-3">
-              <div className="text-[18px] font-semibold text-text">
-                {preview.actorCount}
-              </div>
-              actors
-            </div>
-            <div className="rounded-lg border border-line bg-surface p-3">
-              <div className="text-[18px] font-semibold text-text">
-                {preview.groupCount}
-              </div>
-              groups
             </div>
           </div>
 
@@ -149,16 +128,26 @@ export function ConnectionScreen({
   return (
     <main className="flex h-dvh items-center justify-center bg-bg p-5">
       <section className="anim-pop w-full max-w-[720px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
-            <Link2 size={18} />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
+              <Link2 size={18} />
+            </div>
+            <div>
+              <h1 className="text-[18px] font-semibold">Connect Flow File</h1>
+              <p className="mt-0.5 text-[12.5px] text-mute">
+                Open a JSON source before entering the canvas.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-[18px] font-semibold">Connect Flow File</h1>
-            <p className="mt-0.5 text-[12.5px] text-mute">
-              Open a JSON source before entering the canvas.
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={onAgentPrompt}
+            className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
+          >
+            <Bot size={13} />
+            Agent Prompt
+          </button>
         </div>
 
         <div className="mt-6">

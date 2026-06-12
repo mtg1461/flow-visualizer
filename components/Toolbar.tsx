@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ClipboardCopy, Undo2, Unplug, Wand2 } from "lucide-react";
+import { Bot, Undo2, Unplug, Wand2 } from "lucide-react";
 import type { FileSyncStatus } from "./ConnectionScreen";
 
 interface Props {
@@ -11,8 +11,7 @@ interface Props {
   onUndo: () => void;
   onTidy: () => void;
   onTitle: (title: string) => void;
-  onCopyPrompt: () => void;
-  promptCopied: boolean;
+  onAgentPrompt: () => void;
   onDisconnect: () => void;
 }
 
@@ -24,8 +23,7 @@ export function Toolbar({
   onUndo,
   onTidy,
   onTitle,
-  onCopyPrompt,
-  promptCopied,
+  onAgentPrompt,
   onDisconnect,
 }: Props) {
   const active = status === "watching" || status === "saved";
@@ -96,15 +94,11 @@ export function Toolbar({
       </button>
       <button
         type="button"
-        onClick={onCopyPrompt}
+        onClick={onAgentPrompt}
         className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-accent/25 active:translate-y-0"
       >
-        {promptCopied ? (
-          <Check size={13} className="text-teal" />
-        ) : (
-          <ClipboardCopy size={13} />
-        )}
-        {promptCopied ? "Copied" : "Copy Prompt"}
+        <Bot size={13} />
+        Agent Prompt
       </button>
     </header>
   );

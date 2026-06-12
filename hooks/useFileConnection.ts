@@ -121,16 +121,10 @@ function isBrowserFileHandle(handle: unknown): handle is BrowserFileHandle {
 
 function toConnectionPreview(
   sourceName: string,
-  doc: Explanation,
   canRequestWrite: boolean
 ): ConnectionPreview {
   return {
     sourceName,
-    title: doc.title,
-    summary: doc.summary,
-    stepCount: doc.steps.length,
-    actorCount: doc.actors?.length ?? 0,
-    groupCount: doc.groups?.length ?? 0,
     canRequestWrite,
   };
 }
@@ -161,7 +155,6 @@ export function useFileConnection({
       pendingConnection
         ? toConnectionPreview(
             pendingConnection.sourceName,
-            pendingConnection.preview,
             pendingConnection.kind === "browser" &&
               !!pendingConnection.handle.requestPermission
           )
