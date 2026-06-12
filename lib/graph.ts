@@ -74,6 +74,12 @@ export function groupCellRect(
   return { minC, maxC, minR, maxR };
 }
 
+export function rectsOverlap(a: CellRect, b: CellRect): boolean {
+  return (
+    a.minC <= b.maxC && b.minC <= a.maxC && a.minR <= b.maxR && b.minR <= a.maxR
+  );
+}
+
 export function cellInRect(rect: CellRect, cell: Pos): boolean {
   return (
     cell.col >= rect.minC &&
@@ -293,8 +299,31 @@ export function tidyLayout(doc: Explanation): Explanation {
     ),
   };
 
-  const overlap = (a: CellRect, b: CellRect) =>
-    a.minC <= b.maxC && b.minC <= a.maxC && a.minR <= b.maxR && b.minR <= a.maxR;
+  work = resolveGroupConflicts(work);
+
+  // 5. anchor members at their final cells
+  const finalPos = layoutPositions(work);
+  const memberIds = new Set((work.groups ?? []).flatMap((g) => g.steps));
+  if (memberIds.size) {
+    work = {
+      ...work,
+      steps: work.steps.map((s) => {
+        if (!memberIds.has(s.id) || s.grid) return s;
+        const p = finalPos.get(s.id);
+        return p ? { ...s, grid: { col: p.col, row: p.row } } : s;
+      }),
+    };
+  }
+  return work;
+}
+
+/**
+ * Conflict-resolution passes shared by Tidy and JSON import: separates
+ * overlapping groups, evicts non-members from group footprints, and parks
+ * colliding empty regions. Leaves existing pins alone.
+ */
+export function resolveGroupConflicts(work: Explanation): Explanation {
+  const overlap = rectsOverlap;
 
   for (let iter = 0; iter < 5; iter++) {
     const pos = layoutPositions(work);
@@ -418,19 +447,6 @@ export function tidyLayout(doc: Explanation): Explanation {
     };
   }
 
-  // 5. anchor members at their final cells
-  const finalPos = layoutPositions(work);
-  const memberIds = new Set((work.groups ?? []).flatMap((g) => g.steps));
-  if (memberIds.size) {
-    work = {
-      ...work,
-      steps: work.steps.map((s) => {
-        if (!memberIds.has(s.id) || s.grid) return s;
-        const p = finalPos.get(s.id);
-        return p ? { ...s, grid: { col: p.col, row: p.row } } : s;
-      }),
-    };
-  }
   return work;
 }
 

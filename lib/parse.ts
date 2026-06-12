@@ -114,7 +114,7 @@ export function parseExplanation(raw: string): ParseResult {
         }))
     : undefined;
 
-  const groups = Array.isArray(obj.groups)
+  let groups = Array.isArray(obj.groups)
     ? (obj.groups as Record<string, unknown>[])
         .filter((g) => typeof g?.label === "string" && Array.isArray(g?.steps))
         .map((g, i) => ({
@@ -126,8 +126,19 @@ export function parseExplanation(raw: string): ParseResult {
             .filter((id) => ids.has(id)),
           grid: isGroupGrid(g.grid) ? g.grid : undefined,
         }))
-        .filter((g) => g.steps.length > 0 || g.grid)
     : undefined;
+  if (groups) {
+    // a step belongs to at most one group — first declaration wins
+    const claimed = new Set<string>();
+    groups = groups
+      .map((g) => ({
+        ...g,
+        steps: g.steps.filter(
+          (id) => !claimed.has(id) && (claimed.add(id), true)
+        ),
+      }))
+      .filter((g) => g.steps.length > 0 || g.grid);
+  }
 
   return {
     ok: true,

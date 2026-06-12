@@ -13,7 +13,10 @@ import {
   layoutPositions,
   nearestFreeCell,
   normalize,
+  rectsOverlap,
+  resolveGroupConflicts,
   tidyLayout,
+  type CellRect,
 } from "@/lib/graph";
 import { Canvas } from "./Canvas";
 import { ContextMenu, type MenuState } from "./ContextMenu";
@@ -335,6 +338,10 @@ export function Editor({ initial, initialCustom }: Props) {
 
       const inOtherGroup = (sid: string) =>
         (d.groups ?? []).some((x) => x.id !== id && x.steps.includes(sid));
+      const otherRects = (d.groups ?? [])
+        .filter((x) => x.id !== id)
+        .map((x) => groupCellRect(x, pos))
+        .filter((r): r is CellRect => !!r);
 
       if (mode === "region") {
         // move only the box; membership re-derives from the new footprint
@@ -349,6 +356,13 @@ export function Editor({ initial, initialCustom }: Props) {
           ng.row + ng.rows - 1 > GRID_LIMITS.maxRow
         )
           return;
+        const ngRect = {
+          minC: ng.col,
+          maxC: ng.col + ng.cols - 1,
+          minR: ng.row,
+          maxR: ng.row + ng.rows - 1,
+        };
+        if (otherRects.some((o) => rectsOverlap(ngRect, o))) return;
         const inside = (p: Pos) =>
           p.col >= ng.col &&
           p.col <= ng.col + ng.cols - 1 &&
@@ -375,6 +389,15 @@ export function Editor({ initial, initialCustom }: Props) {
       // stray non-members sitting in the region are adopted
       const members = new Set(g.steps);
       const rect = groupCellRect(g, pos);
+      if (rect) {
+        const shifted = {
+          minC: rect.minC + dCol,
+          maxC: rect.maxC + dCol,
+          minR: rect.minR + dRow,
+          maxR: rect.maxR + dRow,
+        };
+        if (otherRects.some((o) => rectsOverlap(shifted, o))) return;
+      }
       if (rect) {
         for (const s of d.steps) {
           if (members.has(s.id) || inOtherGroup(s.id)) continue;
@@ -439,6 +462,13 @@ export function Editor({ initial, initialCustom }: Props) {
       };
       const inOtherGroup = (sid: string) =>
         (d.groups ?? []).some((x) => x.id !== id && x.steps.includes(sid));
+      // regions never overlap — reject a resize that crosses another group
+      const eff = groupCellRect({ ...g, grid }, pos);
+      const otherRects = (d.groups ?? [])
+        .filter((x) => x.id !== id)
+        .map((x) => groupCellRect(x, pos))
+        .filter((r): r is CellRect => !!r);
+      if (eff && otherRects.some((o) => rectsOverlap(eff, o))) return;
       // the resized footprint adopts the tiles it now covers
       const adopted = d.steps
         .filter((s) => {
@@ -469,6 +499,30 @@ export function Editor({ initial, initialCustom }: Props) {
       let n = existing.length + 1;
       while (existing.some((g) => g.id === `group-${n}`)) n++;
       const id = `group-${n}`;
+      // place the new region at the nearest spot that overlaps no region
+      const pos = layoutPositions(d);
+      const others = existing
+        .map((g) => groupCellRect(g, pos))
+        .filter((r): r is CellRect => !!r);
+      const fits = (c: number, r: number) =>
+        c >= GRID_LIMITS.minCol &&
+        c + 1 <= GRID_LIMITS.maxCol &&
+        r >= GRID_LIMITS.minRow &&
+        r + 1 <= GRID_LIMITS.maxRow &&
+        !others.some((o) =>
+          rectsOverlap({ minC: c, maxC: c + 1, minR: r, maxR: r + 1 }, o)
+        );
+      let spot: Pos | null = fits(cell.col, cell.row) ? cell : null;
+      for (let dd = 1; dd <= 20 && !spot; dd++) {
+        for (let dr = -dd; dr <= dd && !spot; dr++) {
+          for (let dc = -dd; dc <= dd && !spot; dc++) {
+            if (Math.abs(dr) + Math.abs(dc) !== dd) continue;
+            if (fits(cell.col + dc, cell.row + dr))
+              spot = { col: cell.col + dc, row: cell.row + dr };
+          }
+        }
+      }
+      if (!spot) return;
       commit({
         ...d,
         groups: [
@@ -477,7 +531,7 @@ export function Editor({ initial, initialCustom }: Props) {
             id,
             label: `Group ${n}`,
             steps: [],
-            grid: { col: cell.col, row: cell.row, cols: 2, rows: 2 },
+            grid: { col: spot.col, row: spot.row, cols: 2, rows: 2 },
           },
         ],
       });
@@ -821,8 +875,9 @@ export function Editor({ initial, initialCustom }: Props) {
         doc={doc}
         onClose={() => setJsonOpen(false)}
         onApply={(data) => {
-          // imported docs keep their own layout semantics — no stabilization
-          commit(normalize(data), undefined, false);
+          // imported docs keep their own layout semantics — no stabilization,
+          // but overlapping imported groups are separated up front
+          commit(resolveGroupConflicts(normalize(data)), undefined, false);
           setSelection(null);
           setConnectFrom(null);
           setJsonOpen(false);

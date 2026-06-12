@@ -20,6 +20,7 @@ import {
   GY,
   NODE_H,
   NODE_W,
+  type CellRect,
   type EdgeRef,
   type Pos,
   type Selection,
@@ -27,6 +28,7 @@ import {
   edgeKey,
   groupCellRect,
   nearestFreeCell,
+  rectsOverlap,
   routeEdges,
 } from "@/lib/graph";
 import { NodeTile } from "./NodeTile";
@@ -342,19 +344,53 @@ export function Canvas({
       cols: rect.maxC - rect.minC + 1,
       rows: rect.maxR - rect.minR + 1,
     };
+    // other regions are walls: a resize stops at them instead of crossing
+    const otherRects = (doc.groups ?? [])
+      .filter((x) => x.id !== id)
+      .map((x) => groupCellRect(x, positions))
+      .filter((r): r is CellRect => !!r);
+
     const w0 = toWorld(e.clientX, e.clientY);
     let last: { cols: number; rows: number } | null = null;
 
+    const fitsAt = (cols: number, rows: number) => {
+      const eff = groupCellRect(
+        { ...g, grid: { col: base.col, row: base.row, cols, rows } },
+        positions
+      );
+      return !eff || !otherRects.some((o) => rectsOverlap(eff, o));
+    };
+
     const move = (ev: PointerEvent) => {
       const wp = toWorld(ev.clientX, ev.clientY);
-      const cols = Math.min(
+      let cols = Math.min(
         GRID_LIMITS.maxCol - base.col + 1,
         Math.max(1, base.cols + Math.round((wp.x - w0.x) / CELL_W))
       );
-      const rows = Math.min(
+      let rows = Math.min(
         GRID_LIMITS.maxRow - base.row + 1,
         Math.max(1, base.rows + Math.round((wp.y - w0.y) / CELL_H))
       );
+      if (!fitsAt(cols, rows)) {
+        // clamp against neighbouring regions: largest width at the previous
+        // height, then largest height at that width
+        const prevRows = last?.rows ?? base.rows;
+        let bestC = last?.cols ?? base.cols;
+        for (let c = cols; c >= 1; c--)
+          if (fitsAt(c, prevRows)) {
+            bestC = c;
+            break;
+          }
+        let bestR = prevRows;
+        for (let r = rows; r >= 1; r--)
+          if (fitsAt(bestC, r)) {
+            bestR = r;
+            break;
+          }
+        cols = bestC;
+        rows = bestR;
+        if (!fitsAt(cols, rows)) return;
+      }
       last = { cols, rows };
       setGroupResize({ id, col: base.col, row: base.row, cols, rows });
     };
@@ -544,6 +580,12 @@ export function Canvas({
             rows: rect0.maxR - rect0.minR + 1,
           }
         : null);
+    // regions never overlap — other groups' rects are walls for this drag
+    const otherRects = (doc.groups ?? [])
+      .filter((x) => x.id !== id)
+      .map((x) => groupCellRect(x, positions))
+      .filter((r): r is CellRect => !!r);
+
     // the drag carries members plus stray tiles sitting inside the box
     // (matching what the drop adopts), unless they belong to another group
     const carried = new Set(g0?.steps ?? []);
@@ -578,7 +620,28 @@ export function Canvas({
       const dCol = Math.round((wp.x - d.sx) / CELL_W);
       const dRow = Math.round((wp.y - d.sy) / CELL_H);
       let valid = true;
-      if (mode === "region") {
+      // never let this region land on another group's region
+      const moving =
+        mode === "region" && base
+          ? {
+              minC: base.col,
+              maxC: base.col + base.cols - 1,
+              minR: base.row,
+              maxR: base.row + base.rows - 1,
+            }
+          : rect0;
+      if (moving) {
+        const shifted = {
+          minC: moving.minC + dCol,
+          maxC: moving.maxC + dCol,
+          minR: moving.minR + dRow,
+          maxR: moving.maxR + dRow,
+        };
+        if (otherRects.some((o) => rectsOverlap(shifted, o))) valid = false;
+      }
+      if (!valid) {
+        // fall through with valid=false so the rect tints rose
+      } else if (mode === "region") {
         valid =
           !!base &&
           base.col + dCol >= GRID_LIMITS.minCol &&
