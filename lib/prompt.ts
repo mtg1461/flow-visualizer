@@ -1,47 +1,32 @@
-export const SCHEMA_PROMPT = `Explain how the system we discussed works as a single JSON object, so it can be rendered as one visual flow. Output ONLY the JSON, no prose.
+export const SCHEMA_PROMPT = `Create one JSON file that explains the system as a visual flow. Return only valid JSON, with no markdown or prose.
 
-Schema (TypeScript):
-
-interface Explanation {
-  title: string;            // "How X works", under ~70 chars
-  summary?: string;         // the essence in one sentence
-  actors?: {                // the actors involved
-    id: string;
-    name: string;
-    role?: string;          // short phrase: what it is responsible for
-  }[];
-  steps: {                  // ordered sequence — the spine of the flow
-    id: string;             // short slug, e.g. "embed"
-    title: string;          // headline under ~60 chars, plain language
-    detail?: string;        // 1–2 sentences: what happens and WHY it matters
-    kind?: "input" | "process" | "decision" | "output" | "wait";
-    actor?: string;         // id of the actor performing this step
-    branches?: {            // decision steps only: where each condition leads
-      when: string;         // plain-language condition, e.g. "cache hit"
-      to: string;           // target step id (earlier id = a retry/loop)
-    }[];
-    then?: string;          // next step id when flow does NOT continue to the
-                            // following step (earlier id = feedback loop)
-    grid?: { col: number; row: number }; // canvas position — OMIT this;
-                            // the tool manages it
-  }[];
-  loops?: {                 // system-level feedback beyond step-to-step flow
-    from: string;           // step id
-    to: string;             // step id
-    label?: string;         // what feeds back and what it changes
-  }[];
-  groups?: {                // optional: cluster steps that form one subsystem
-    id: string;
-    label: string;          // e.g. "Retrieval subsystem"
-    steps: string[];        // member step ids
-  }[];
+Use this shape:
+{
+  "title": "How ... works",
+  "summary": "One sentence explaining the core mechanism.",
+  "actors": [
+    { "id": "short-slug", "name": "Actor name", "role": "what it controls or provides" }
+  ],
+  "steps": [
+    {
+      "id": "short-slug",
+      "title": "Short action label",
+      "detail": "One or two plain sentences: what happens and why it matters downstream.",
+      "kind": "input | process | decision | output | wait",
+      "actor": "actor-id",
+      "branches": [{ "when": "condition", "to": "step-id" }],
+      "then": "step-id"
+    }
+  ],
+  "loops": [{ "from": "step-id", "to": "step-id", "label": "what feeds back" }],
+  "groups": [{ "id": "short-slug", "label": "Subsystem name", "steps": ["step-id"] }]
 }
 
 Rules:
-- 5–12 steps. Order them as the main path through the system.
-- Mark the entry as kind "input" and the result as kind "output".
-- Every fork in behaviour is a "decision" step with 2–3 branches.
-- Retries and feedback go BACKWARD: a branch or "then" pointing to an
-  earlier step id, or an entry in "loops".
-- Plain language a newcomer understands. No jargon without a gloss in detail.
-- Cause and effect live in "detail": say what the step changes downstream.`;
+- Use 5 to 12 ordered steps for the main path.
+- Use "input" for the starting trigger and "output" for the final result.
+- Use "decision" plus 2 or 3 branches for real forks.
+- Use "then" only when the next step is not simply the following item.
+- Backward "then", backward branches, or "loops" represent retries and feedback.
+- Keep ids stable, lowercase, and unique.
+- Do not include layout or styling fields such as grid, color, or line.`;

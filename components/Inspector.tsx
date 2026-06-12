@@ -560,12 +560,39 @@ function DocPanel({
   actions: EditorActions;
 }) {
   const colors = actorColors(doc);
+  const actors = doc.actors ?? [];
+  const groups = doc.groups ?? [];
 
   return (
     <div>
-      <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
-        Explanation
-      </span>
+      <div className="rounded-xl border border-line bg-surface p-3">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
+          Explanation
+        </span>
+        <h2 className="mt-1 text-[15px] font-semibold leading-snug text-text">
+          {doc.title || "Untitled flow"}
+        </h2>
+        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[10.5px] text-faint">
+          <div className="rounded-md border border-line bg-well px-1.5 py-2">
+            <div className="text-[14px] font-semibold text-text">
+              {doc.steps.length}
+            </div>
+            steps
+          </div>
+          <div className="rounded-md border border-line bg-well px-1.5 py-2">
+            <div className="text-[14px] font-semibold text-text">
+              {actors.length}
+            </div>
+            actors
+          </div>
+          <div className="rounded-md border border-line bg-well px-1.5 py-2">
+            <div className="text-[14px] font-semibold text-text">
+              {groups.length}
+            </div>
+            groups
+          </div>
+        </div>
+      </div>
 
       <label className={labelCls} htmlFor="insp-summary">
         Summary
@@ -580,101 +607,122 @@ function DocPanel({
         }
       />
 
-      <span className={labelCls}>Actors</span>
-      <div className="space-y-1.5">
-        {(doc.actors ?? []).map((p) => (
-          <div key={p.id} className="flex items-center gap-2">
-            <span
-              className="size-2 shrink-0 rounded-full"
-              style={{
-                background: colors.get(p.id),
-                boxShadow: `0 0 6px ${colors.get(p.id)}66`,
-              }}
-            />
-            <input
-              aria-label="Actor name"
-              className={`${miniInputCls} w-0 flex-1 text-[12.5px] font-medium`}
-              value={p.name}
-              onChange={(e) =>
-                actions.updateActor(p.id, { name: e.target.value })
-              }
-            />
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute">
+          Actors
+        </span>
+        <button
+          type="button"
+          onClick={() => actions.addActor("New actor")}
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2 py-1 text-[11.5px] text-mute transition-colors hover:border-line-strong hover:text-text"
+        >
+          <Plus size={11} />
+          Add
+        </button>
+      </div>
+      <div className="mt-2 space-y-2">
+        {actors.map((p) => (
+          <div
+            key={p.id}
+            className="rounded-lg border border-line bg-surface p-2.5"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{
+                  background: colors.get(p.id),
+                  boxShadow: `0 0 7px ${colors.get(p.id)}66`,
+                }}
+              />
+              <input
+                aria-label="Actor name"
+                className={`${miniInputCls} min-w-0 flex-1 text-[12.5px] font-medium`}
+                value={p.name}
+                onChange={(e) =>
+                  actions.updateActor(p.id, { name: e.target.value })
+                }
+              />
+              <button
+                type="button"
+                aria-label={`Delete actor ${p.name}`}
+                onClick={() => actions.deleteActor(p.id)}
+                className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
             <input
               aria-label="Actor role"
-              className={`${miniInputCls} w-0 flex-[1.3] text-[12px]`}
+              className={`${miniInputCls} mt-2 w-full text-[12px]`}
               value={p.role ?? ""}
-              placeholder="role…"
+              placeholder="role..."
               onChange={(e) =>
                 actions.updateActor(p.id, { role: e.target.value })
               }
             />
-            <button
-              type="button"
-              aria-label={`Delete actor ${p.name}`}
-              onClick={() => actions.deleteActor(p.id)}
-              className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
-            >
-              <Trash2 size={12} />
-            </button>
           </div>
         ))}
-        <button
-          type="button"
-          onClick={() => actions.addActor("New actor")}
-          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[11.5px] text-mute transition-colors hover:border-line-strong hover:text-text"
-        >
-          <Plus size={11} />
-          Add actor
-        </button>
+        {actors.length === 0 && (
+          <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[12px] text-faint">
+            No actors.
+          </p>
+        )}
       </div>
 
-      {(doc.groups?.length ?? 0) > 0 && (
-        <>
-          <span className={labelCls}>Groups</span>
-          <div className="space-y-1.5">
-            {(doc.groups ?? []).map((g) => {
+      {groups.length > 0 && (
+        <div className="mt-5">
+          <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute">
+            Groups
+          </span>
+          <div className="mt-2 space-y-2">
+            {groups.map((g) => {
               const color = g.color ?? "#9b9bff";
               const next =
                 STEP_PALETTE[
                   (STEP_PALETTE.indexOf(color) + 1) % STEP_PALETTE.length
                 ];
               return (
-                <div key={g.id} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    title="Change color"
-                    aria-label={`Change color of ${g.label}`}
-                    onClick={() => actions.updateGroup(g.id, { color: next })}
-                    className="size-3.5 shrink-0 cursor-pointer rounded-md border border-dashed transition-transform hover:scale-110"
-                    style={{
-                      borderColor: color,
-                      background: withAlpha(color, "26"),
-                    }}
-                  />
-                  <input
-                    aria-label="Group label"
-                    className={`${miniInputCls} w-0 flex-1 text-[12.5px]`}
-                    value={g.label}
-                    onChange={(e) =>
-                      actions.updateGroup(g.id, { label: e.target.value })
-                    }
-                  />
-                  <span className="text-[10.5px] text-faint">
-                    {g.steps.length}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`Delete group ${g.label}`}
-                    onClick={() => actions.deleteGroup(g.id)}
-                    className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
-                  >
-                    <Trash2 size={11} />
-                  </button>
+                <div
+                  key={g.id}
+                  className="rounded-lg border border-line bg-surface p-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      title="Change color"
+                      aria-label={`Change color of ${g.label}`}
+                      onClick={() => actions.updateGroup(g.id, { color: next })}
+                      className="size-3.5 shrink-0 cursor-pointer rounded-md border border-dashed transition-transform hover:scale-110"
+                      style={{
+                        borderColor: color,
+                        background: withAlpha(color, "26"),
+                      }}
+                    />
+                    <input
+                      aria-label="Group label"
+                      className={`${miniInputCls} min-w-0 flex-1 text-[12.5px]`}
+                      value={g.label}
+                      onChange={(e) =>
+                        actions.updateGroup(g.id, { label: e.target.value })
+                      }
+                    />
+                    <span className="rounded-md border border-line bg-well px-1.5 py-1 text-[10.5px] text-faint">
+                      {g.steps.length}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Delete group ${g.label}`}
+                      onClick={() => actions.deleteGroup(g.id)}
+                      className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

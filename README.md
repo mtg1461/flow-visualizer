@@ -12,18 +12,17 @@ Not draw.io, not a dashboard: one canvas, one inspector, one JSON contract.
 
 ```bash
 npm install
-npm run dev   # http://localhost:4400
+npm run dev   # http://localhost:3000 by default
 ```
 
 ## Use
 
-- **File** (toolbar) opens a local JSON file, renders it, watches for edits
-  from another process, and writes visual edits back to the same path. Try
+- The app opens to a connection screen. Enter a path, browse, or drag/drop a
+  JSON file to preview it; then **Connect** to open the canvas. Try
   `examples\live-flow.json`, or an absolute path like
   `C:\Projects\other-project\flow.json`.
-- **JSON** (toolbar) → **Schema prompt** → give it to your agent at the end of
-  any "how does X work" conversation, then paste the JSON it returns and
-  **Apply**. Try [examples/thermostat.json](examples/thermostat.json).
+- **Copy Prompt** (toolbar) gives an agent the JSON contract for creating a
+  flow file. Try [examples/thermostat.json](examples/thermostat.json).
 - Drag tiles to rearrange (positions persist via the optional `grid` field).
 - Click a tile to edit it in the inspector; click its ○ port, then another
   tile, to connect. Decision steps grow condition branches; other steps get
@@ -38,8 +37,9 @@ npm run dev   # http://localhost:4400
   each step can carry a custom color.
 - With nothing selected the inspector edits the summary, actors, and
   groups. `Delete` removes the selection, `Esc` deselects.
-- Everything autosaves to `localStorage`; a bound file also autosaves to disk.
-  **JSON → Copy JSON** exports the current state, edits included.
+- Everything autosaves to `localStorage`; a connected file saves back to disk
+  after a short quiet period following each visual edit. The watcher polls only
+  to detect external file changes.
 
 The data shape is `Explanation` in [lib/types.ts](lib/types.ts). Layout,
 edge-building, and orthogonal routing live in [lib/graph.ts](lib/graph.ts).
@@ -58,9 +58,8 @@ edge-building, and orthogonal routing live in [lib/graph.ts](lib/graph.ts).
    group.
 4. **Previews tell the truth.** What you see mid-drag is exactly what the
    drop produces.
-5. **Tidy and JSON-apply re-layout.** They are the explicit escape hatches
-   from rules 1–2: Tidy strips every pin (including group anchors), and
-   applying pasted JSON trusts the document's own layout.
+5. **Tidy re-layouts.** It is the explicit escape hatch from rules 1-2:
+   Tidy strips every pin, including group anchors, and rebuilds the layout.
 
 ## Stack
 

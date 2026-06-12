@@ -23,8 +23,13 @@ import { Canvas } from "./Canvas";
 import { ContextMenu, type MenuState } from "./ContextMenu";
 import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
-import { JsonDialog } from "./JsonDialog";
-import { FileDialog, type FileSyncStatus } from "./FileDialog";
+import {
+  ConnectionScreen,
+  type ConnectionPreview,
+  type FileSyncStatus,
+} from "./ConnectionScreen";
+import { DisconnectDialog } from "./DisconnectDialog";
+import { SCHEMA_PROMPT } from "@/lib/prompt";
 
 export const STORAGE_KEY = "unfold:data";
 
@@ -47,6 +52,64 @@ interface LocalFileStat {
   path: string;
   mtimeMs: number;
   size: number;
+}
+
+interface BrowserWritable {
+  write: (contents: string) => Promise<void>;
+  close: () => Promise<void>;
+}
+
+interface BrowserFileHandle {
+  kind?: string;
+  name: string;
+  getFile: () => Promise<File>;
+  queryPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+  requestPermission?: (options?: { mode?: "read" | "readwrite" }) => Promise<PermissionState>;
+  createWritable?: () => Promise<BrowserWritable>;
+}
+
+interface BrowserFileConnection {
+  name: string;
+  lastModified: number;
+  size: number;
+  handle: BrowserFileHandle;
+}
+
+type PendingConnection =
+  | (LocalFileRead & {
+      kind: "path";
+      preview: Explanation;
+      normalized: Explanation;
+      sourceName: string;
+    })
+  | {
+      kind: "browser";
+      preview: Explanation;
+      normalized: Explanation;
+      sourceName: string;
+      lastModified: number;
+      size: number;
+      handle: BrowserFileHandle;
+    };
+
+declare global {
+  interface Window {
+    showOpenFilePicker?: (options?: unknown) => Promise<BrowserFileHandle[]>;
+  }
+
+  interface DataTransferItem {
+    getAsFileSystemHandle?: () => Promise<BrowserFileHandle | { kind?: string }>;
+  }
+}
+
+function singleDroppedPath(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length > 1)
+    throw new Error("Connect one JSON file at a time.");
+  return lines[0] ?? "";
 }
 
 function persist(doc: Explanation | null) {
@@ -78,6 +141,31 @@ async function postFileApi<T>(
       typeof data?.error === "string" ? data.error : "File operation failed."
     );
   return data as T;
+}
+
+function isBrowserFileHandle(handle: unknown): handle is BrowserFileHandle {
+  return (
+    typeof handle === "object" &&
+    handle !== null &&
+    typeof (handle as BrowserFileHandle).name === "string" &&
+    typeof (handle as BrowserFileHandle).getFile === "function"
+  );
+}
+
+function toConnectionPreview(
+  sourceName: string,
+  doc: Explanation,
+  canRequestWrite: boolean
+): ConnectionPreview {
+  return {
+    sourceName,
+    title: doc.title,
+    summary: doc.summary,
+    stepCount: doc.steps.length,
+    actorCount: doc.actors?.length ?? 0,
+    groupCount: doc.groups?.length ?? 0,
+    canRequestWrite,
+  };
 }
 
 /**
@@ -145,10 +233,14 @@ export function Editor({ initial }: Props) {
   const [doc, setDocState] = useState<Explanation>(() => normalize(initial));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
-  const [jsonOpen, setJsonOpen] = useState(false);
-  const [fileOpen, setFileOpen] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [filePath, setFilePath] = useState("");
+  const [pendingConnection, setPendingConnection] =
+    useState<PendingConnection | null>(null);
   const [boundFile, setBoundFile] = useState<LocalFileStat | null>(null);
+  const [browserFile, setBrowserFile] =
+    useState<BrowserFileConnection | null>(null);
   const [fileStatus, setFileStatus] = useState<FileSyncStatus>("idle");
   const [fileError, setFileError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
@@ -212,6 +304,16 @@ export function Editor({ initial }: Props) {
   }, []);
 
   const positions = useMemo(() => layoutPositions(doc), [doc]);
+  const connected = !!boundFile || !!browserFile;
+  const connectionName = boundFile?.path ?? browserFile?.name ?? "";
+  const preview = pendingConnection
+    ? toConnectionPreview(
+        pendingConnection.sourceName,
+        pendingConnection.preview,
+        pendingConnection.kind === "browser" &&
+          !!pendingConnection.handle.requestPermission
+      )
+    : null;
 
   /* ------------------------------------------------------- mutations */
 
@@ -716,6 +818,82 @@ export function Editor({ initial }: Props) {
     }
   }, []);
 
+  const previewPath = useCallback(async (path: string) => {
+    const wanted = path.trim();
+    if (!wanted) {
+      setPendingConnection(null);
+      setFileError(null);
+      setFileStatus("idle");
+      return;
+    }
+    setFileError(null);
+    setFileStatus("loading");
+    try {
+      const data = await postFileApi<LocalFileRead>("read", { path: wanted });
+      const result = parseExplanation(data.contents);
+      if (!result.ok) throw new Error(result.error);
+      const normalized = resolveGroupConflicts(normalize(result.data));
+      setPendingConnection({
+        ...data,
+        kind: "path",
+        preview: result.data,
+        normalized,
+        sourceName: data.path,
+      });
+      setFileStatus("watching");
+    } catch (error) {
+      setPendingConnection(null);
+      setFileError(error instanceof Error ? error.message : "Could not preview file.");
+      setFileStatus("error");
+    }
+  }, []);
+
+  const previewBrowserHandle = useCallback(async (handle: BrowserFileHandle) => {
+    if (handle.kind && handle.kind !== "file") {
+      setPendingConnection(null);
+      setFileError("Drop or browse to a JSON file.");
+      setFileStatus("error");
+      return;
+    }
+    setFileError(null);
+    setFileStatus("loading");
+    try {
+      const file = await handle.getFile();
+      const result = parseExplanation(await file.text());
+      if (!result.ok) throw new Error(result.error);
+      const normalized = resolveGroupConflicts(normalize(result.data));
+      setPendingConnection({
+        kind: "browser",
+        preview: result.data,
+        normalized,
+        sourceName: handle.name || file.name || "flow.json",
+        lastModified: file.lastModified,
+        size: file.size,
+        handle,
+      });
+      setFileStatus("watching");
+    } catch (error) {
+      setPendingConnection(null);
+      setFileError(error instanceof Error ? error.message : "Could not preview file.");
+      setFileStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (connected) return;
+    const wanted = filePath.trim();
+    if (!wanted) {
+      setPendingConnection((current) =>
+        current?.kind === "path" ? null : current
+      );
+      setFileError(null);
+      setFileStatus("idle");
+      return;
+    }
+    const id = window.setTimeout(() => previewPath(wanted), 450);
+    return () => window.clearTimeout(id);
+  }, [connected, filePath, previewPath]);
+
   const loadFile = useCallback(
     async (path = filePath, source: "manual" | "watch" = "manual") => {
       const wanted = path.trim();
@@ -739,6 +917,7 @@ export function Editor({ initial }: Props) {
           mtimeMs: data.mtimeMs,
           size: data.size,
         });
+        setBrowserFile(null);
         setLastSyncedAt(Date.now());
         commit(next, undefined, false);
         setSelection(null);
@@ -757,37 +936,172 @@ export function Editor({ initial }: Props) {
     [commit, filePath, settleFileStatus]
   );
 
-  const saveFileNow = useCallback(
-    async (path = boundFile?.path ?? filePath) => {
-      const wanted = path.trim();
-      if (!wanted) {
-        setFileError("Enter a local JSON file path.");
+  const connectBrowserHandle = useCallback(
+    async (
+      handle: BrowserFileHandle,
+      source: "manual" | "watch" = "manual"
+    ) => {
+      if (handle.kind && handle.kind !== "file") {
+        setFileError("Drop or browse to a JSON file.");
         setFileStatus("error");
         return;
       }
-      const contents = serializeDoc(docRef.current);
+      readingFile.current = true;
       setFileError(null);
-      setFileStatus("saving");
+      setFileStatus(source === "watch" ? "external" : "loading");
       try {
-        const data = await postFileApi<LocalFileStat>("write", {
-          path: wanted,
-          contents,
+        const file = await handle.getFile();
+        const result = parseExplanation(await file.text());
+        if (!result.ok) throw new Error(result.error);
+        const next = resolveGroupConflicts(normalize(result.data));
+        lastFileJson.current = serializeDoc(next);
+        setBoundFile(null);
+        setBrowserFile({
+          name: handle.name || file.name || "flow.json",
+          lastModified: file.lastModified,
+          size: file.size,
+          handle,
         });
-        lastFileJson.current = contents;
-        setFilePath(data.path);
-        setBoundFile(data);
         setLastSyncedAt(Date.now());
-        settleFileStatus("saved");
+        commit(next, undefined, false);
+        setSelection(null);
+        setConnectFrom(null);
+        setFitSignal((s) => s + 1);
+        settleFileStatus(source === "watch" ? "external" : "watching");
       } catch (error) {
-        setFileError(error instanceof Error ? error.message : "Could not save file.");
+        setFileError(error instanceof Error ? error.message : "Could not open file.");
         setFileStatus("error");
+      } finally {
+        window.setTimeout(() => {
+          readingFile.current = false;
+        }, 0);
       }
     },
-    [boundFile?.path, filePath, settleFileStatus]
+    [commit, settleFileStatus]
   );
 
+  const browseFile = useCallback(async () => {
+    if (!window.showOpenFilePicker) {
+      setFileError("Browse needs browser file access. Paste a local path instead.");
+      setFileStatus("error");
+      return;
+    }
+    try {
+      const handles = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          {
+            description: "JSON files",
+            accept: { "application/json": [".json"] },
+          },
+        ],
+      });
+      if (handles.length !== 1)
+        throw new Error("Connect one JSON file at a time.");
+      const [handle] = handles;
+      if (handle) {
+        setFilePath("");
+        await previewBrowserHandle(handle);
+      }
+    } catch (error) {
+      const name = error instanceof Error ? error.name : "";
+      if (name !== "AbortError") {
+        setFileError(error instanceof Error ? error.message : "Could not browse file.");
+        setFileStatus("error");
+      }
+    }
+  }, [previewBrowserHandle]);
+
+  const connectDropped = useCallback(
+    async (dataTransfer: DataTransfer) => {
+      const fileItems = [...dataTransfer.items].filter(
+        (x) => x.kind === "file"
+      );
+      if (dataTransfer.files.length > 1 || fileItems.length > 1) {
+        setPendingConnection(null);
+        setFileError("Connect one JSON file at a time.");
+        setFileStatus("error");
+        return;
+      }
+      let text = "";
+      try {
+        text = singleDroppedPath(dataTransfer.getData("text/plain"));
+      } catch (error) {
+        setPendingConnection(null);
+        setFileError(error instanceof Error ? error.message : "Connect one JSON file at a time.");
+        setFileStatus("error");
+        return;
+      }
+      if (text && (text.endsWith(".json") || text.includes("\\") || text.includes("/"))) {
+        setFilePath(text);
+        await previewPath(text);
+        return;
+      }
+      const item = fileItems[0];
+      const handle = item?.getAsFileSystemHandle
+        ? await item.getAsFileSystemHandle()
+        : null;
+      if (isBrowserFileHandle(handle)) {
+        setFilePath("");
+        await previewBrowserHandle(handle);
+        return;
+      }
+      setFileError("Drop a JSON file with browser file access, or paste its path.");
+      setFileStatus("error");
+    },
+    [previewBrowserHandle, previewPath]
+  );
+
+  const requestBrowserWrite = useCallback(async (handle: BrowserFileHandle) => {
+    if (handle.requestPermission) {
+      const permission = await handle.requestPermission({ mode: "readwrite" });
+      if (permission !== "granted")
+        throw new Error("Write permission was not granted for this file.");
+      return;
+    }
+    if (!handle.createWritable)
+      throw new Error("This browser did not provide write access for the selected file.");
+  }, []);
+
+  const connectPending = useCallback(async () => {
+    if (!pendingConnection) return;
+    setFileError(null);
+    setFileStatus("loading");
+    try {
+      const next = pendingConnection.normalized;
+      lastFileJson.current = serializeDoc(next);
+      if (pendingConnection.kind === "path") {
+        setBoundFile({
+          path: pendingConnection.path,
+          mtimeMs: pendingConnection.mtimeMs,
+          size: pendingConnection.size,
+        });
+        setBrowserFile(null);
+      } else {
+        await requestBrowserWrite(pendingConnection.handle);
+        setBoundFile(null);
+        setBrowserFile({
+          name: pendingConnection.sourceName,
+          lastModified: pendingConnection.lastModified,
+          size: pendingConnection.size,
+          handle: pendingConnection.handle,
+        });
+      }
+      setPendingConnection(null);
+      setLastSyncedAt(Date.now());
+      commit(next, undefined, false);
+      setSelection(null);
+      setConnectFrom(null);
+      setFitSignal((s) => s + 1);
+      settleFileStatus("watching");
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Could not connect file.");
+      setFileStatus("error");
+    }
+  }, [commit, pendingConnection, requestBrowserWrite, settleFileStatus]);
+
   useEffect(() => {
-    if (!boundFile || readingFile.current) return;
+    if ((!boundFile && !browserFile) || readingFile.current) return;
     const contents = serializeDoc(doc);
     if (contents === lastFileJson.current) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -795,12 +1109,26 @@ export function Editor({ initial }: Props) {
     saveTimer.current = window.setTimeout(async () => {
       saveTimer.current = null;
       try {
-        const data = await postFileApi<LocalFileStat>("write", {
-          path: boundFile.path,
-          contents,
-        });
+        if (boundFile) {
+          const data = await postFileApi<LocalFileStat>("write", {
+            path: boundFile.path,
+            contents,
+          });
+          setBoundFile(data);
+        } else if (browserFile?.handle.createWritable) {
+          const writable = await browserFile.handle.createWritable();
+          await writable.write(contents.endsWith("\n") ? contents : `${contents}\n`);
+          await writable.close();
+          const file = await browserFile.handle.getFile();
+          setBrowserFile({
+            ...browserFile,
+            lastModified: file.lastModified,
+            size: file.size,
+          });
+        } else {
+          throw new Error("This connection cannot write back. Paste a local path instead.");
+        }
         lastFileJson.current = contents;
-        setBoundFile(data);
         setLastSyncedAt(Date.now());
         setFileError(null);
         settleFileStatus("saved");
@@ -815,7 +1143,7 @@ export function Editor({ initial }: Props) {
         saveTimer.current = null;
       }
     };
-  }, [boundFile, doc, settleFileStatus]);
+  }, [boundFile, browserFile, doc, settleFileStatus]);
 
   useEffect(() => {
     if (!boundFile) return;
@@ -841,6 +1169,56 @@ export function Editor({ initial }: Props) {
       window.clearInterval(id);
     };
   }, [boundFile, loadFile]);
+
+  useEffect(() => {
+    if (!browserFile) return;
+    let alive = true;
+    const poll = async () => {
+      if (readingFile.current || saveTimer.current) return;
+      try {
+        const file = await browserFile.handle.getFile();
+        if (!alive) return;
+        if (Math.abs(file.lastModified - browserFile.lastModified) > 1)
+          await connectBrowserHandle(browserFile.handle, "watch");
+      } catch (error) {
+        if (!alive) return;
+        setFileError(error instanceof Error ? error.message : "Could not watch file.");
+        setFileStatus("error");
+      }
+    };
+    const id = window.setInterval(poll, 1400);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [browserFile, connectBrowserHandle]);
+
+  const disconnect = useCallback(() => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    setBoundFile(null);
+    setBrowserFile(null);
+    setFileStatus("idle");
+    setFileError(null);
+    setLastSyncedAt(null);
+    setSelection(null);
+    setConnectFrom(null);
+    setMenu(null);
+    setDisconnectOpen(false);
+  }, []);
+
+  const copyPrompt = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(SCHEMA_PROMPT);
+      setPromptCopied(true);
+      window.setTimeout(() => setPromptCopied(false), 1600);
+    } catch {
+      setFileError("Could not copy the prompt.");
+      setFileStatus("error");
+    }
+  }, []);
 
   const actions: EditorActions = useMemo(
     () => ({
@@ -961,8 +1339,7 @@ export function Editor({ initial }: Props) {
       } else if (
         (e.key === "Delete" || e.key === "Backspace") &&
         selection &&
-        !jsonOpen &&
-        !fileOpen
+        !disconnectOpen
       ) {
         e.preventDefault();
         if (selection.kind === "step") deleteStep(selection.id);
@@ -972,20 +1349,47 @@ export function Editor({ initial }: Props) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [selection, connectFrom, jsonOpen, fileOpen, deleteStep, deleteEdge, undo, redo, actions]);
+  }, [selection, connectFrom, disconnectOpen, deleteStep, deleteEdge, undo, redo, actions]);
 
   /* ---------------------------------------------------------- render */
+
+  if (!connected) {
+    return (
+      <ConnectionScreen
+        path={filePath}
+        status={fileStatus}
+        error={fileError}
+        preview={preview}
+        onPathChange={(path) => {
+          setFilePath(path);
+          setFileError(null);
+        }}
+        onConnectPreview={connectPending}
+        onClearPreview={() => {
+          setFilePath("");
+          setPendingConnection(null);
+          setFileError(null);
+          setFileStatus("idle");
+        }}
+        onBrowse={browseFile}
+        onDropConnection={connectDropped}
+      />
+    );
+  }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <Toolbar
         title={doc.title}
+        connectionName={connectionName}
+        status={fileStatus}
         canUndo={canUndo}
         onUndo={undo}
         onTidy={tidy}
         onTitle={(title) => commit({ ...doc, title }, "doc:title")}
-        onOpenFile={() => setFileOpen(true)}
-        onOpenJson={() => setJsonOpen(true)}
+        onCopyPrompt={copyPrompt}
+        promptCopied={promptCopied}
+        onDisconnect={() => setDisconnectOpen(true)}
       />
       <div className="relative min-h-0 flex-1">
         <Canvas
@@ -1033,33 +1437,11 @@ export function Editor({ initial }: Props) {
           />
         )}
       </div>
-      <JsonDialog
-        open={jsonOpen}
-        doc={doc}
-        onClose={() => setJsonOpen(false)}
-        onApply={(data) => {
-          // imported docs keep their own layout semantics — no stabilization,
-          // but overlapping imported groups are separated up front
-          commit(resolveGroupConflicts(normalize(data)), undefined, false);
-          setSelection(null);
-          setConnectFrom(null);
-          setJsonOpen(false);
-          setFitSignal((s) => s + 1);
-        }}
-      />
-      <FileDialog
-        open={fileOpen}
-        path={filePath}
-        status={fileStatus}
-        error={fileError}
-        lastSyncedAt={lastSyncedAt}
-        onPathChange={(path) => {
-          setFilePath(path);
-          setFileError(null);
-        }}
-        onOpenPath={() => loadFile()}
-        onSaveNow={() => saveFileNow()}
-        onClose={() => setFileOpen(false)}
+      <DisconnectDialog
+        open={disconnectOpen}
+        connectionName={connectionName}
+        onCancel={() => setDisconnectOpen(false)}
+        onConfirm={disconnect}
       />
     </div>
   );
