@@ -13,8 +13,7 @@
       "title": "The room is measured",
       "detail": "The sensor samples the air every few seconds. Everything downstream trusts this single number.",
       "kind": "input",
-      "part": "sensor",
-      "outputs": ["current temperature"]
+      "part": "sensor"
     },
     {
       "id": "compare",
@@ -22,7 +21,6 @@
       "detail": "The controller subtracts the reading from the target. A small dead band around the target stops the heater from flapping on and off.",
       "kind": "decision",
       "part": "ctrl",
-      "inputs": ["current temperature", "target temperature"],
       "branches": [
         { "when": "below target minus the dead band", "to": "heat" },
         { "when": "inside or above the dead band", "to": "idle" }
@@ -34,7 +32,6 @@
       "detail": "Heat flows into the room, which slowly raises the next sensor reading — the action changes the input that triggered it.",
       "kind": "process",
       "part": "heater",
-      "outputs": ["warmer air"],
       "then": "read"
     },
     {
@@ -43,8 +40,7 @@
       "detail": "The heater stays off while the room slowly leaks heat to the outside, drifting the reading back down until the cycle repeats.",
       "kind": "wait",
       "part": "room",
-      "then": "read",
-      "note": "The leak is why the loop never ends — comfort is maintenance, not a destination."
+      "then": "read"
     }
   ],
   "loops": [

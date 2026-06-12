@@ -31,10 +31,6 @@ export interface Step {
   kind?: StepKind;
   /** Part id of the moving part performing this step. */
   part?: string;
-  /** What flows into this step. */
-  inputs?: string[];
-  /** What flows out of this step. */
-  outputs?: string[];
   /** Decision steps: where each condition leads. */
   branches?: Branch[];
   /** Explicit next step when flow does not continue to the following step. */
@@ -45,8 +41,6 @@ export interface Step {
   thenColor?: string;
   /** Custom line style for the outgoing flow edge. Tool-managed. */
   thenLine?: EdgeLine;
-  /** Optional caveat or aside. */
-  note?: string;
   /** Tile position on the canvas. Managed by the tool — agents omit it. */
   grid?: { col: number; row: number };
   /** Custom accent color (hex). Overrides the kind color. */

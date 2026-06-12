@@ -18,7 +18,6 @@ export const SAMPLE: Explanation = {
         "One or two sentences of intent. Everything downstream is the agent translating this into working code.",
       kind: "input",
       part: "user",
-      inputs: ["intent"],
     },
     {
       id: "explore",
@@ -27,7 +26,6 @@ export const SAMPLE: Explanation = {
         "Search, open files, follow imports. The goal is a mental model: where the change belongs and what it might break.",
       kind: "process",
       part: "agent",
-      outputs: ["mental model"],
     },
     {
       id: "plan",
@@ -36,7 +34,6 @@ export const SAMPLE: Explanation = {
         "Which files to touch, in what order, and what could go wrong. Cheap to fix here, expensive to fix later.",
       kind: "process",
       part: "agent",
-      outputs: ["plan"],
     },
     {
       id: "edit",
@@ -45,7 +42,6 @@ export const SAMPLE: Explanation = {
         "The plan turns into edits. Small, reviewable changes that match the style of the code around them.",
       kind: "process",
       part: "agent",
-      outputs: ["diff"],
     },
     {
       id: "test",
@@ -54,7 +50,6 @@ export const SAMPLE: Explanation = {
         "Compile, lint, unit tests. The machine gets the first vote on whether the change is real progress.",
       kind: "process",
       part: "tests",
-      outputs: ["results"],
     },
     {
       id: "verdict",
@@ -74,7 +69,6 @@ export const SAMPLE: Explanation = {
       kind: "process",
       part: "agent",
       then: "edit",
-      note: "Each lap around this loop should shrink the problem.",
     },
     {
       id: "review",
@@ -93,7 +87,6 @@ export const SAMPLE: Explanation = {
         "Committed, merged, done. The feature exists now — and so does its weight on every future change.",
       kind: "output",
       part: "codebase",
-      outputs: ["commit"],
     },
   ],
   loops: [

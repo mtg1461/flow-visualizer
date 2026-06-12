@@ -1,6 +1,6 @@
 "use client";
 
-import { Braces, Plus, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { Braces, Sparkles, Undo2, Wand2 } from "lucide-react";
 
 interface Props {
   title: string;
@@ -9,7 +9,6 @@ interface Props {
   onUndo: () => void;
   onTidy: () => void;
   onTitle: (title: string) => void;
-  onAddStep: () => void;
   onOpenJson: () => void;
   onReset: () => void;
 }
@@ -21,12 +20,11 @@ export function Toolbar({
   onUndo,
   onTidy,
   onTitle,
-  onAddStep,
   onOpenJson,
   onReset,
 }: Props) {
   return (
-    <header className="z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line-strong bg-surface px-3.5">
+    <header className="anim-toolbar z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line-strong bg-surface px-3.5">
       <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden>
         <path
           d="M3 15 C 3 8, 15 10, 15 3"
@@ -69,23 +67,15 @@ export function Toolbar({
         type="button"
         title="Re-run the automatic layout"
         onClick={onTidy}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-3 text-[12.5px] text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0"
       >
         <Wand2 size={13} />
         Tidy
       </button>
       <button
         type="button"
-        onClick={onAddStep}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
-      >
-        <Plus size={13} />
-        Step
-      </button>
-      <button
-        type="button"
         onClick={onOpenJson}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-accent/25 active:translate-y-0"
       >
         <Braces size={13} />
         JSON

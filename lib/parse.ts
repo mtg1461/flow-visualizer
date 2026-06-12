@@ -56,8 +56,6 @@ export function parseExplanation(raw: string): ParseResult {
       detail: typeof s.detail === "string" ? s.detail : undefined,
       kind,
       part: typeof s.part === "string" ? s.part : undefined,
-      inputs: strArray(s.inputs),
-      outputs: strArray(s.outputs),
       branches: Array.isArray(s.branches)
         ? s.branches
             .filter(
@@ -77,7 +75,6 @@ export function parseExplanation(raw: string): ParseResult {
       thenLabel: typeof s.thenLabel === "string" ? s.thenLabel : undefined,
       thenColor: typeof s.thenColor === "string" ? s.thenColor : undefined,
       thenLine: asLine(s.thenLine),
-      note: typeof s.note === "string" ? s.note : undefined,
       grid: isGrid(s.grid) ? { col: s.grid.col, row: s.grid.row } : undefined,
       color: typeof s.color === "string" ? s.color : undefined,
     });
@@ -172,10 +169,4 @@ function isGrid(v: unknown): v is { col: number; row: number } {
     typeof (v as Record<string, unknown>).col === "number" &&
     typeof (v as Record<string, unknown>).row === "number"
   );
-}
-
-function strArray(v: unknown): string[] | undefined {
-  if (!Array.isArray(v)) return undefined;
-  const out = v.filter((x): x is string => typeof x === "string" && x.trim() !== "");
-  return out.length ? out : undefined;
 }

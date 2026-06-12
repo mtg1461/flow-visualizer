@@ -41,6 +41,20 @@
   }
 }
 
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
 .anim-appear {
   animation: appear 0.9s ease-out both;
 }
@@ -49,9 +63,34 @@
   animation: pop 0.22s ease-out both;
 }
 
+.anim-toolbar {
+  animation: rise-in 0.22s ease-out both;
+}
+
+.anim-canvas {
+  animation: appear 0.28s ease-out both;
+}
+
+.anim-inspector {
+  animation: slide-in-right 0.24s ease-out both;
+}
+
+.anim-panel-change {
+  animation: rise-in 0.16s ease-out both;
+}
+
+.anim-drop {
+  animation: pop 0.14s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-appear,
-  .anim-pop {
+  .anim-pop,
+  .anim-toolbar,
+  .anim-canvas,
+  .anim-inspector,
+  .anim-panel-change,
+  .anim-drop {
     animation: none;
   }
 }

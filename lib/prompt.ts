@@ -16,15 +16,12 @@ interface Explanation {
     detail?: string;        // 1–2 sentences: what happens and WHY it matters
     kind?: "input" | "process" | "decision" | "output" | "wait";
     part?: string;          // id of the part performing this step
-    inputs?: string[];      // what flows in (1–3 short labels)
-    outputs?: string[];     // what flows out (1–3 short labels)
     branches?: {            // decision steps only: where each condition leads
       when: string;         // plain-language condition, e.g. "cache hit"
       to: string;           // target step id (earlier id = a retry/loop)
     }[];
     then?: string;          // next step id when flow does NOT continue to the
                             // following step (earlier id = feedback loop)
-    note?: string;          // optional caveat or aside
     grid?: { col: number; row: number }; // canvas position — OMIT this;
                             // the tool manages it
   }[];

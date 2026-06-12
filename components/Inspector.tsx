@@ -1,6 +1,13 @@
 "use client";
 
-import { CornerDownRight, Link2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  CornerDownRight,
+  Link2,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import type {
   Branch,
   EdgeLine,
@@ -42,36 +49,45 @@ interface Props {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-line bg-well px-2.5 py-1.5 text-[13px] text-text placeholder:text-faint focus:border-accent/60 focus:outline-none";
+  "w-full rounded-lg border border-line-strong bg-well px-2.5 py-1.5 text-[13px] text-text shadow-inner shadow-black/25 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/70 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/15";
+const selectCls = `${inputCls} cursor-pointer appearance-none pr-8`;
 const miniInputCls =
-  "rounded-md border border-line bg-well px-1.5 py-1 text-text placeholder:text-faint focus:border-accent/60 focus:outline-none";
+  "rounded-md border border-line-strong bg-well px-1.5 py-1 text-text shadow-inner shadow-black/20 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/70 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/15";
 const labelCls =
-  "mb-1.5 mt-4 block text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute";
+  "mb-1.5 mt-3.5 block text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute";
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
 }
 
 export function Inspector({ doc, selection, actions }: Props) {
+  const panelKey = selection
+    ? selection.kind === "edge"
+      ? `${selection.kind}:${JSON.stringify(selection.ref)}`
+      : `${selection.kind}:${selection.id}`
+    : "doc";
+
   return (
-    <aside className="absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-line-strong bg-raise p-4 shadow-2xl shadow-black/40 md:flex">
-      {selection?.kind === "step" ? (
-        <StepPanel
-          doc={doc}
-          step={doc.steps.find((s) => s.id === selection.id)}
-          actions={actions}
-        />
-      ) : selection?.kind === "edge" ? (
-        <EdgePanel doc={doc} edgeRef={selection.ref} actions={actions} />
-      ) : selection?.kind === "group" ? (
-        <GroupPanel
-          doc={doc}
-          group={doc.groups?.find((g) => g.id === selection.id)}
-          actions={actions}
-        />
-      ) : (
-        <DocPanel doc={doc} actions={actions} />
-      )}
+    <aside className="anim-inspector absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-line-strong bg-raise p-4 shadow-2xl shadow-black/40 md:flex">
+      <div key={panelKey} className="anim-panel-change">
+        {selection?.kind === "step" ? (
+          <StepPanel
+            doc={doc}
+            step={doc.steps.find((s) => s.id === selection.id)}
+            actions={actions}
+          />
+        ) : selection?.kind === "edge" ? (
+          <EdgePanel doc={doc} edgeRef={selection.ref} actions={actions} />
+        ) : selection?.kind === "group" ? (
+          <GroupPanel
+            doc={doc}
+            group={doc.groups?.find((g) => g.id === selection.id)}
+            actions={actions}
+          />
+        ) : (
+          <DocPanel doc={doc} actions={actions} />
+        )}
+      </div>
     </aside>
   );
 }
@@ -119,28 +135,23 @@ function StepPanel({
       </label>
       <input
         id="insp-title"
-        className={inputCls}
+        className={`${inputCls} text-[13.5px] font-medium`}
         value={step.title}
         onChange={(e) => actions.updateStep(step.id, { title: e.target.value })}
       />
 
-      <label className={labelCls} htmlFor="insp-kind">
-        Kind
+      <label className={labelCls} htmlFor="insp-detail">
+        Detail
       </label>
-      <select
-        id="insp-kind"
-        className={`${inputCls} cursor-pointer appearance-none`}
-        value={step.kind ?? "process"}
+      <textarea
+        id="insp-detail"
+        className={`${inputCls} h-24 resize-none leading-relaxed`}
+        value={step.detail ?? ""}
+        placeholder="What happens here, and why it matters..."
         onChange={(e) =>
-          actions.updateStep(step.id, { kind: e.target.value as StepKind })
+          actions.updateStep(step.id, { detail: e.target.value || undefined })
         }
-      >
-        {Object.entries(KIND_META).map(([k, meta]) => (
-          <option key={k} value={k}>
-            {meta.label}
-          </option>
-        ))}
-      </select>
+      />
 
       <span className={labelCls}>Color</span>
       <div className="flex items-center gap-1.5">
@@ -171,108 +182,56 @@ function StepPanel({
         ))}
       </div>
 
-      <label className={labelCls} htmlFor="insp-group">
-        Group
+      <label className={labelCls} htmlFor="insp-kind">
+        Kind
       </label>
-      <select
-        id="insp-group"
-        className={`${inputCls} cursor-pointer appearance-none`}
-        value={doc.groups?.find((g) => g.steps.includes(step.id))?.id ?? ""}
-        onChange={(e) => actions.assignGroup(step.id, e.target.value || null)}
-      >
-        <option value="">none</option>
-        {(doc.groups ?? []).map((g) => (
-          <option key={g.id} value={g.id}>
-            {g.label}
-          </option>
-        ))}
-        <option value="__new__">+ new group</option>
-      </select>
+      <div className="relative">
+        <select
+          id="insp-kind"
+          className={selectCls}
+          value={step.kind ?? "process"}
+          onChange={(e) =>
+            actions.updateStep(step.id, { kind: e.target.value as StepKind })
+          }
+        >
+          {Object.entries(KIND_META).map(([k, meta]) => (
+            <option key={k} value={k}>
+              {meta.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={14}
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-faint"
+        />
+      </div>
 
       <label className={labelCls} htmlFor="insp-part">
         Moving part
       </label>
-      <select
-        id="insp-part"
-        className={`${inputCls} cursor-pointer appearance-none`}
-        value={step.part ?? ""}
-        onChange={(e) =>
-          actions.updateStep(step.id, { part: e.target.value || undefined })
-        }
-      >
-        <option value="">none</option>
-        {(doc.parts ?? []).map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          id="insp-part"
+          className={selectCls}
+          value={step.part ?? ""}
+          onChange={(e) =>
+            actions.updateStep(step.id, { part: e.target.value || undefined })
+          }
+        >
+          <option value="">none</option>
+          {(doc.parts ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={14}
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-faint"
+        />
+      </div>
 
-      <label className={labelCls} htmlFor="insp-detail">
-        Detail
-      </label>
-      <textarea
-        id="insp-detail"
-        className={`${inputCls} h-20 resize-none leading-relaxed`}
-        value={step.detail ?? ""}
-        placeholder="What happens here, and why it matters…"
-        onChange={(e) =>
-          actions.updateStep(step.id, { detail: e.target.value || undefined })
-        }
-      />
-
-      <label className={labelCls} htmlFor="insp-in">
-        Inputs <span className="normal-case tracking-normal">(comma-separated)</span>
-      </label>
-      <input
-        id="insp-in"
-        className={inputCls}
-        value={(step.inputs ?? []).join(", ")}
-        placeholder="question, context"
-        onChange={(e) => {
-          const arr = e.target.value
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-          actions.updateStep(step.id, {
-            inputs: arr.length ? arr : undefined,
-          });
-        }}
-      />
-
-      <label className={labelCls} htmlFor="insp-out">
-        Outputs
-      </label>
-      <input
-        id="insp-out"
-        className={inputCls}
-        value={(step.outputs ?? []).join(", ")}
-        placeholder="draft answer"
-        onChange={(e) => {
-          const arr = e.target.value
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-          actions.updateStep(step.id, {
-            outputs: arr.length ? arr : undefined,
-          });
-        }}
-      />
-
-      <label className={labelCls} htmlFor="insp-note">
-        Note
-      </label>
-      <input
-        id="insp-note"
-        className={inputCls}
-        value={step.note ?? ""}
-        placeholder="optional caveat"
-        onChange={(e) =>
-          actions.updateStep(step.id, { note: e.target.value || undefined })
-        }
-      />
-
-      <span className={labelCls}>Connections</span>
+      <span className={`${labelCls} border-t border-line pt-3`}>Connections</span>
       <div className="space-y-1.5">
         {step.then && (
           <div className="flex items-center gap-1.5 text-[11.5px]">
@@ -332,7 +291,7 @@ function StepPanel({
         <button
           type="button"
           onClick={() => actions.startConnect(step.id)}
-          className="mt-1 flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[11.5px] text-mute transition-colors hover:border-teal/40 hover:text-teal"
+          className="mx-auto mt-3 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-teal/40 bg-teal/10 px-3.5 py-2 text-[12px] font-medium text-teal transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-teal/70 hover:bg-teal/15 active:translate-y-0"
         >
           <Link2 size={11} />
           Connect to a step…
@@ -720,4 +679,3 @@ function DocPanel({
     </div>
   );
 }
-

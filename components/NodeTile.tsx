@@ -60,8 +60,10 @@ export function NodeTile({
             : ", 0 6px 20px rgba(0,0,0,0.45)"
         }`,
       }}
-      className={`group absolute select-none rounded-lg border bg-tile transition-[border-color,box-shadow] duration-150 hover:border-line-strong ${
-        dragging ? "z-20" : ""
+      className={`group absolute select-none rounded-lg border bg-tile hover:border-line-strong ${
+        dragging
+          ? "z-20 scale-[1.015] transition-none"
+          : "transition-[left,top,border-color,box-shadow,transform,opacity] duration-200 ease-out hover:-translate-y-0.5"
       } ${connectTarget ? "cursor-crosshair" : "cursor-default"}`}
     >
       {/* tinted kind band */}

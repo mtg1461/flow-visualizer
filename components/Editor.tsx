@@ -771,8 +771,8 @@ export function Editor({ initial, initialCustom }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // undo/redo work everywhere, including inside inputs — all input
-      // values are doc state, so this is the only undo that makes sense
+      // undo/redo work everywhere, including form fields — their values
+      // are doc state, so this is the only undo that makes sense
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -820,7 +820,6 @@ export function Editor({ initial, initialCustom }: Props) {
         onUndo={undo}
         onTidy={tidy}
         onTitle={(title) => commit({ ...doc, title }, "doc:title")}
-        onAddStep={() => addStep()}
         onOpenJson={() => setJsonOpen(true)}
         onReset={reset}
       />

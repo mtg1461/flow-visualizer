@@ -759,7 +759,7 @@ export function Canvas({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onContextMenu={onContextMenu}
-      className={`relative h-full w-full overflow-hidden ${
+      className={`anim-canvas relative h-full w-full overflow-hidden ${
         panRef.current?.moved ? "cursor-grabbing" : "cursor-grab"
       } ${connectFrom ? "cursor-crosshair" : ""}`}
       style={{ touchAction: "none" }}
@@ -796,7 +796,7 @@ export function Canvas({
               key={r.id}
               data-group-id={r.id}
               onPointerDown={startGroupDrag(r.id)}
-              className="absolute cursor-move rounded-2xl border-[1.5px] border-dashed transition-[box-shadow] duration-150"
+              className="absolute cursor-move rounded-2xl border-[1.5px] border-dashed transition-[left,top,width,height,border-color,background-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-px"
               title="Drag to move group + tiles · Alt-drag to move the region only · right-click for actions"
               style={{
                 left: r.left,
@@ -845,7 +845,7 @@ export function Canvas({
         {drag && dragCell && (
           <div
             aria-hidden
-            className="absolute rounded-[10px] border-2 border-dashed border-accent/70 bg-accent/10"
+            className="anim-drop absolute rounded-[10px] border-2 border-dashed border-accent/70 bg-accent/10"
             style={{
               left: dragCell.col * CELL_W + GX,
               top: dragCell.row * CELL_H + GY,
@@ -952,7 +952,7 @@ export function Canvas({
                   strokeWidth={isSel ? 2.4 : 1.4}
                   strokeDasharray={style.dash}
                   markerEnd={`url(#${style.marker})`}
-                  className="pointer-events-none"
+                  className="pointer-events-none transition-[stroke,stroke-width,opacity,filter] duration-200 ease-out"
                   style={
                     isSel
                       ? { filter: "drop-shadow(0 0 4px rgba(255,255,255,0.45))" }
@@ -1002,7 +1002,7 @@ export function Canvas({
                   e.stopPropagation();
                   onSelect({ kind: "edge", ref: edge.ref });
                 }}
-                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[11px] leading-4 shadow-md shadow-black/40 ${tone} ${
+                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[11px] leading-4 shadow-md shadow-black/40 transition-[left,top,border-color,color,box-shadow,opacity] duration-200 ease-out ${tone} ${
                   isSel ? "ring-1 ring-accent/60" : ""
                 }`}
                 style={{
@@ -1062,13 +1062,13 @@ export function Canvas({
 
       {/* connect-mode hint */}
       {connectFrom && (
-        <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/40 bg-raise px-3.5 py-1.5 text-[12px] text-teal shadow-lg shadow-black/30">
+        <div className="anim-pop pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/40 bg-raise px-3.5 py-1.5 text-[12px] text-teal shadow-lg shadow-black/30">
           Click a tile to connect — Esc to cancel
         </div>
       )}
 
       {/* zoom controls */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-line-strong bg-raise p-1 shadow-lg shadow-black/30">
+      <div className="anim-pop absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-line-strong bg-raise p-1 shadow-lg shadow-black/30">
         <button
           type="button"
           aria-label="Zoom out"
