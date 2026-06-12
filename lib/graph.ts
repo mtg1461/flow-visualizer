@@ -74,6 +74,33 @@ export function groupCellRect(
   return { minC, maxC, minR, maxR };
 }
 
+/** A group's member-only footprint, ignoring any explicit region. */
+function groupMemberCellRect(g: Group, pos: Map<string, Pos>): CellRect | null {
+  let minC = Infinity;
+  let maxC = -Infinity;
+  let minR = Infinity;
+  let maxR = -Infinity;
+  for (const id of g.steps) {
+    const p = pos.get(id);
+    if (!p) continue;
+    minC = Math.min(minC, p.col);
+    maxC = Math.max(maxC, p.col);
+    minR = Math.min(minR, p.row);
+    maxR = Math.max(maxR, p.row);
+  }
+  if (!Number.isFinite(minC)) return null;
+  return { minC, maxC, minR, maxR };
+}
+
+function rectToGrid(rect: CellRect) {
+  return {
+    col: rect.minC,
+    row: rect.minR,
+    cols: rect.maxC - rect.minC + 1,
+    rows: rect.maxR - rect.minR + 1,
+  };
+}
+
 export function rectsOverlap(a: CellRect, b: CellRect): boolean {
   return (
     a.minC <= b.maxC && b.minC <= a.maxC && a.minR <= b.maxR && b.minR <= a.maxR
@@ -287,6 +314,9 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
  * Each pass re-runs the real layout, so the result is exactly what renders.
  */
 export function tidyLayout(doc: Explanation): Explanation {
+  const originalMembers = new Map(
+    (doc.groups ?? []).map((g) => [g.id, [...g.steps]])
+  );
   let work: Explanation = {
     ...doc,
     steps: doc.steps.map((s) => {
@@ -301,6 +331,20 @@ export function tidyLayout(doc: Explanation): Explanation {
 
   work = resolveGroupConflicts(work);
 
+  // Tidy may move tiles and reshape groups, but it must never change what
+  // belongs to a group. Reassert membership after conflict repair so that
+  // future layout changes cannot accidentally smuggle in coverage rules.
+  if (originalMembers.size) {
+    work = {
+      ...work,
+      groups: work.groups?.map((g) =>
+        originalMembers.has(g.id)
+          ? { ...g, steps: [...originalMembers.get(g.id)!] }
+          : g
+      ),
+    };
+  }
+
   // 5. anchor members at their final cells
   const finalPos = layoutPositions(work);
   const memberIds = new Set((work.groups ?? []).flatMap((g) => g.steps));
@@ -311,6 +355,20 @@ export function tidyLayout(doc: Explanation): Explanation {
         if (!memberIds.has(s.id) || s.grid) return s;
         const p = finalPos.get(s.id);
         return p ? { ...s, grid: { col: p.col, row: p.row } } : s;
+      }),
+    };
+  }
+
+  // Member groups end fitted to the members they already own. Empty groups
+  // keep their explicit region because there are no members to fit around.
+  if (work.groups?.some((g) => g.steps.length > 0)) {
+    const pos = layoutPositions(work);
+    work = {
+      ...work,
+      groups: work.groups.map((g) => {
+        if (g.steps.length === 0) return g;
+        const rect = groupMemberCellRect(g, pos);
+        return rect ? { ...g, grid: rectToGrid(rect) } : g;
       }),
     };
   }

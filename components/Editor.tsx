@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EdgeLine, Explanation, Step } from "@/lib/types";
-import { SAMPLE } from "@/lib/sample";
+import { parseExplanation } from "@/lib/parse";
 import {
   GRID_LIMITS,
   type EdgeRef,
@@ -10,6 +10,7 @@ import {
   type Selection,
   cellInRect,
   groupCellRect,
+  denormalize,
   layoutPositions,
   nearestFreeCell,
   normalize,
@@ -23,6 +24,7 @@ import { ContextMenu, type MenuState } from "./ContextMenu";
 import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
 import { JsonDialog } from "./JsonDialog";
+import { FileDialog, type FileSyncStatus } from "./FileDialog";
 
 export const STORAGE_KEY = "unfold:data";
 
@@ -32,7 +34,19 @@ const COALESCE_MS = 1000;
 
 interface Props {
   initial: Explanation;
-  initialCustom: boolean;
+}
+
+interface LocalFileRead {
+  path: string;
+  contents: string;
+  mtimeMs: number;
+  size: number;
+}
+
+interface LocalFileStat {
+  path: string;
+  mtimeMs: number;
+  size: number;
 }
 
 function persist(doc: Explanation | null) {
@@ -42,6 +56,28 @@ function persist(doc: Explanation | null) {
   } catch {
     // storage unavailable — edits still live for this session
   }
+}
+
+function serializeDoc(doc: Explanation) {
+  return JSON.stringify(denormalize(doc), null, 2);
+}
+
+async function postFileApi<T>(
+  endpoint: "read" | "stat" | "write",
+  body: { path: string; contents?: string }
+): Promise<T> {
+  const response = await fetch(`/api/file/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok)
+    throw new Error(
+      typeof data?.error === "string" ? data.error : "File operation failed."
+    );
+  return data as T;
 }
 
 /**
@@ -105,12 +141,17 @@ function validSelection(
   return (doc.loops?.length ?? 0) > ref.index ? sel : null;
 }
 
-export function Editor({ initial, initialCustom }: Props) {
+export function Editor({ initial }: Props) {
   const [doc, setDocState] = useState<Explanation>(() => normalize(initial));
-  const [isCustom, setIsCustom] = useState(initialCustom);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [fileOpen, setFileOpen] = useState(false);
+  const [filePath, setFilePath] = useState("");
+  const [boundFile, setBoundFile] = useState<LocalFileStat | null>(null);
+  const [fileStatus, setFileStatus] = useState<FileSyncStatus>("idle");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [fitSignal, setFitSignal] = useState(0);
@@ -120,6 +161,9 @@ export function Editor({ initial, initialCustom }: Props) {
   const past = useRef<Explanation[]>([]);
   const future = useRef<Explanation[]>([]);
   const lastCommit = useRef({ key: "", at: 0 });
+  const lastFileJson = useRef(serializeDoc(doc));
+  const saveTimer = useRef<number | null>(null);
+  const readingFile = useRef(false);
 
   const commit = useCallback(
     (next: Explanation, coalesceKey?: string, stabilize = true) => {
@@ -138,7 +182,6 @@ export function Editor({ initial, initialCustom }: Props) {
       future.current = [];
       setCanUndo(true);
       setDocState(next);
-      setIsCustom(true);
       persist(next);
     },
     []
@@ -151,7 +194,6 @@ export function Editor({ initial, initialCustom }: Props) {
     lastCommit.current = { key: "", at: 0 };
     setCanUndo(past.current.length > 0);
     setDocState(prev);
-    setIsCustom(true);
     persist(prev);
     setSelection((s) => validSelection(prev, s));
     setConnectFrom(null);
@@ -164,7 +206,6 @@ export function Editor({ initial, initialCustom }: Props) {
     lastCommit.current = { key: "", at: 0 };
     setCanUndo(true);
     setDocState(next);
-    setIsCustom(true);
     persist(next);
     setSelection((s) => validSelection(next, s));
     setConnectFrom(null);
@@ -664,19 +705,142 @@ export function Editor({ initial, initialCustom }: Props) {
     setFitSignal((s) => s + 1);
   }, [commit]);
 
-  const reset = useCallback(() => {
-    past.current.push(docRef.current);
-    if (past.current.length > HISTORY_LIMIT) past.current.shift();
-    future.current = [];
-    lastCommit.current = { key: "", at: 0 };
-    setCanUndo(true);
-    setDocState(normalize(SAMPLE));
-    setIsCustom(false);
-    persist(null);
-    setSelection(null);
-    setConnectFrom(null);
-    setFitSignal((s) => s + 1);
+  const settleFileStatus = useCallback((status: FileSyncStatus) => {
+    setFileStatus(status);
+    if (status === "saved" || status === "external") {
+      window.setTimeout(() => {
+        setFileStatus((current) =>
+          current === status ? "watching" : current
+        );
+      }, 1300);
+    }
   }, []);
+
+  const loadFile = useCallback(
+    async (path = filePath, source: "manual" | "watch" = "manual") => {
+      const wanted = path.trim();
+      if (!wanted) {
+        setFileError("Enter a local JSON file path.");
+        setFileStatus("error");
+        return;
+      }
+      readingFile.current = true;
+      setFileError(null);
+      setFileStatus(source === "watch" ? "external" : "loading");
+      try {
+        const data = await postFileApi<LocalFileRead>("read", { path: wanted });
+        const result = parseExplanation(data.contents);
+        if (!result.ok) throw new Error(result.error);
+        const next = resolveGroupConflicts(normalize(result.data));
+        lastFileJson.current = serializeDoc(next);
+        setFilePath(data.path);
+        setBoundFile({
+          path: data.path,
+          mtimeMs: data.mtimeMs,
+          size: data.size,
+        });
+        setLastSyncedAt(Date.now());
+        commit(next, undefined, false);
+        setSelection(null);
+        setConnectFrom(null);
+        setFitSignal((s) => s + 1);
+        settleFileStatus(source === "watch" ? "external" : "watching");
+      } catch (error) {
+        setFileError(error instanceof Error ? error.message : "Could not open file.");
+        setFileStatus("error");
+      } finally {
+        window.setTimeout(() => {
+          readingFile.current = false;
+        }, 0);
+      }
+    },
+    [commit, filePath, settleFileStatus]
+  );
+
+  const saveFileNow = useCallback(
+    async (path = boundFile?.path ?? filePath) => {
+      const wanted = path.trim();
+      if (!wanted) {
+        setFileError("Enter a local JSON file path.");
+        setFileStatus("error");
+        return;
+      }
+      const contents = serializeDoc(docRef.current);
+      setFileError(null);
+      setFileStatus("saving");
+      try {
+        const data = await postFileApi<LocalFileStat>("write", {
+          path: wanted,
+          contents,
+        });
+        lastFileJson.current = contents;
+        setFilePath(data.path);
+        setBoundFile(data);
+        setLastSyncedAt(Date.now());
+        settleFileStatus("saved");
+      } catch (error) {
+        setFileError(error instanceof Error ? error.message : "Could not save file.");
+        setFileStatus("error");
+      }
+    },
+    [boundFile?.path, filePath, settleFileStatus]
+  );
+
+  useEffect(() => {
+    if (!boundFile || readingFile.current) return;
+    const contents = serializeDoc(doc);
+    if (contents === lastFileJson.current) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    setFileStatus("saving");
+    saveTimer.current = window.setTimeout(async () => {
+      saveTimer.current = null;
+      try {
+        const data = await postFileApi<LocalFileStat>("write", {
+          path: boundFile.path,
+          contents,
+        });
+        lastFileJson.current = contents;
+        setBoundFile(data);
+        setLastSyncedAt(Date.now());
+        setFileError(null);
+        settleFileStatus("saved");
+      } catch (error) {
+        setFileError(error instanceof Error ? error.message : "Could not save file.");
+        setFileStatus("error");
+      }
+    }, 700);
+    return () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+    };
+  }, [boundFile, doc, settleFileStatus]);
+
+  useEffect(() => {
+    if (!boundFile) return;
+    let alive = true;
+    const poll = async () => {
+      if (readingFile.current || saveTimer.current) return;
+      try {
+        const data = await postFileApi<LocalFileStat>("stat", {
+          path: boundFile.path,
+        });
+        if (!alive) return;
+        if (Math.abs(data.mtimeMs - boundFile.mtimeMs) > 1)
+          await loadFile(boundFile.path, "watch");
+      } catch (error) {
+        if (!alive) return;
+        setFileError(error instanceof Error ? error.message : "Could not watch file.");
+        setFileStatus("error");
+      }
+    };
+    const id = window.setInterval(poll, 1400);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [boundFile, loadFile]);
 
   const actions: EditorActions = useMemo(
     () => ({
@@ -797,7 +961,8 @@ export function Editor({ initial, initialCustom }: Props) {
       } else if (
         (e.key === "Delete" || e.key === "Backspace") &&
         selection &&
-        !jsonOpen
+        !jsonOpen &&
+        !fileOpen
       ) {
         e.preventDefault();
         if (selection.kind === "step") deleteStep(selection.id);
@@ -807,7 +972,7 @@ export function Editor({ initial, initialCustom }: Props) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [selection, connectFrom, jsonOpen, deleteStep, deleteEdge, undo, redo, actions]);
+  }, [selection, connectFrom, jsonOpen, fileOpen, deleteStep, deleteEdge, undo, redo, actions]);
 
   /* ---------------------------------------------------------- render */
 
@@ -815,13 +980,12 @@ export function Editor({ initial, initialCustom }: Props) {
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <Toolbar
         title={doc.title}
-        isCustom={isCustom}
         canUndo={canUndo}
         onUndo={undo}
         onTidy={tidy}
         onTitle={(title) => commit({ ...doc, title }, "doc:title")}
+        onOpenFile={() => setFileOpen(true)}
         onOpenJson={() => setJsonOpen(true)}
-        onReset={reset}
       />
       <div className="relative min-h-0 flex-1">
         <Canvas
@@ -882,6 +1046,20 @@ export function Editor({ initial, initialCustom }: Props) {
           setJsonOpen(false);
           setFitSignal((s) => s + 1);
         }}
+      />
+      <FileDialog
+        open={fileOpen}
+        path={filePath}
+        status={fileStatus}
+        error={fileError}
+        lastSyncedAt={lastSyncedAt}
+        onPathChange={(path) => {
+          setFilePath(path);
+          setFileError(null);
+        }}
+        onOpenPath={() => loadFile()}
+        onSaveNow={() => saveFileNow()}
+        onClose={() => setFileOpen(false)}
       />
     </div>
   );

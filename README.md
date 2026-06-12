@@ -17,6 +17,10 @@ npm run dev   # http://localhost:4400
 
 ## Use
 
+- **File** (toolbar) opens a local JSON file, renders it, watches for edits
+  from another process, and writes visual edits back to the same path. Try
+  `examples\live-flow.json`, or an absolute path like
+  `C:\Projects\other-project\flow.json`.
 - **JSON** (toolbar) → **Schema prompt** → give it to your agent at the end of
   any "how does X work" conversation, then paste the JSON it returns and
   **Apply**. Try [examples/thermostat.json](examples/thermostat.json).
@@ -34,8 +38,8 @@ npm run dev   # http://localhost:4400
   each step can carry a custom color.
 - With nothing selected the inspector edits the summary, actors, and
   groups. `Delete` removes the selection, `Esc` deselects.
-- Everything autosaves to `localStorage`; **JSON → Copy JSON** exports the
-  current state, edits included.
+- Everything autosaves to `localStorage`; a bound file also autosaves to disk.
+  **JSON → Copy JSON** exports the current state, edits included.
 
 The data shape is `Explanation` in [lib/types.ts](lib/types.ts). Layout,
 edge-building, and orthogonal routing live in [lib/graph.ts](lib/graph.ts).

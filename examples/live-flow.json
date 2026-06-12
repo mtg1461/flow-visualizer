@@ -1,0 +1,108 @@
+{
+  "title": "Two-way project sync",
+  "summary": "A local file becomes the shared contract between an editing agent and the visual graph.",
+  "actors": [
+    {
+      "id": "agent",
+      "name": "Agent",
+      "role": "writes the JSON"
+    },
+    {
+      "id": "visualizer",
+      "name": "Visualizer",
+      "role": "renders and edits the graph"
+    },
+    {
+      "id": "file",
+      "name": "Local file",
+      "role": "shared source of truth"
+    }
+  ],
+  "steps": [
+    {
+      "id": "choose-file",
+      "title": "Choose a local flow file",
+      "detail": "Enter an absolute or project-relative JSON path in the File dialog.",
+      "kind": "input",
+      "actor": "visualizer",
+      "grid": {
+        "col": 0,
+        "row": 0
+      }
+    },
+    {
+      "id": "read-json",
+      "title": "Read JSON through the app",
+      "detail": "A local Next API route reads the file and returns its contents and modified time.",
+      "kind": "process",
+      "actor": "visualizer",
+      "grid": {
+        "col": 0,
+        "row": 1
+      }
+    },
+    {
+      "id": "render-graph",
+      "title": "Render the graph",
+      "detail": "The existing parser validates the file and the graph model becomes the canvas state.",
+      "kind": "process",
+      "actor": "visualizer",
+      "grid": {
+        "col": 0,
+        "row": 2
+      }
+    },
+    {
+      "id": "watch-file",
+      "title": "Watch for external edits",
+      "detail": "The browser polls the file timestamp and reloads when another agent updates it.",
+      "kind": "process",
+      "actor": "file",
+      "grid": {
+        "col": 0,
+        "row": 3
+      }
+    },
+    {
+      "id": "edit-canvas",
+      "title": "Edit visually",
+      "detail": "Move tiles, rename actors, adjust groups, or change edge labels directly in the app.",
+      "kind": "process",
+      "actor": "visualizer",
+      "grid": {
+        "col": 0,
+        "row": 4
+      }
+    },
+    {
+      "id": "write-back",
+      "title": "Write changes back",
+      "detail": "After a short quiet period, the visualized document is serialized back to the same path.",
+      "kind": "output",
+      "actor": "file",
+      "grid": {
+        "col": 0,
+        "row": 5
+      }
+    }
+  ],
+  "loops": [
+    {
+      "from": "write-back",
+      "to": "watch-file",
+      "label": "another agent can keep editing the same file"
+    }
+  ],
+  "groups": [
+    {
+      "id": "sync-loop",
+      "label": "Sync loop",
+      "color": "#7fd6c2",
+      "steps": [
+        "watch-file",
+        "edit-canvas",
+        "write-back"
+      ]
+    }
+  ]
+}

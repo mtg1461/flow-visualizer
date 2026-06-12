@@ -7,29 +7,22 @@ import { parseExplanation } from "@/lib/parse";
 import { Editor, STORAGE_KEY } from "@/components/Editor";
 
 export default function Home() {
-  const [initial, setInitial] = useState<{
-    doc: Explanation;
-    custom: boolean;
-  } | null>(null);
+  const [initial, setInitial] = useState<Explanation | null>(null);
 
   useEffect(() => {
     let doc = SAMPLE;
-    let custom = false;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const result = parseExplanation(stored);
-        if (result.ok) {
-          doc = result.data;
-          custom = true;
-        }
+        if (result.ok) doc = result.data;
       }
     } catch {
       // unreadable storage — fall back to the sample
     }
-    setInitial({ doc, custom });
+    setInitial(doc);
   }, []);
 
   if (!initial) return <div className="h-dvh bg-bg" />;
-  return <Editor initial={initial.doc} initialCustom={initial.custom} />;
+  return <Editor initial={initial} />;
 }
