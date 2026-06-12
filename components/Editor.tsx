@@ -13,6 +13,7 @@ import {
   layoutPositions,
   nearestFreeCell,
   normalize,
+  tidyLayout,
 } from "@/lib/graph";
 import { Canvas } from "./Canvas";
 import { ContextMenu, type MenuState } from "./ContextMenu";
@@ -602,21 +603,10 @@ export function Editor({ initial, initialCustom }: Props) {
 
   const tidy = useCallback(() => {
     const d = docRef.current;
-    if (d.steps.some((s) => s.grid)) {
-      // rule 5: Tidy is the explicit re-layout — skip member stabilization
-      commit(
-        {
-          ...d,
-          steps: d.steps.map((s) => {
-            if (!s.grid) return s;
-            const { grid: _dropped, ...rest } = s;
-            return rest;
-          }),
-        },
-        undefined,
-        false
-      );
-    }
+    // rule 5: Tidy is the explicit re-layout — skip member stabilization
+    const next = tidyLayout(d);
+    if (JSON.stringify(next) !== JSON.stringify(d))
+      commit(next, undefined, false);
     setFitSignal((s) => s + 1);
   }, [commit]);
 

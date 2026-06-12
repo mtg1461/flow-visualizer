@@ -270,6 +270,170 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
   return pos;
 }
 
+/**
+ * Tidy: clean-slate re-layout that also repairs group geometry.
+ * 1. Tile pins are dropped; member groups drop their explicit region, so
+ *    their rect re-derives as a perfect fit around the members.
+ * 2. Overlapping groups separate — later groups shift right of earlier.
+ * 3. Non-member tiles are evicted from any group's footprint.
+ * 4. Empty regions that collide with the layout park to its right.
+ * 5. Group members end pinned (rule 2: groups anchor their members).
+ * Each pass re-runs the real layout, so the result is exactly what renders.
+ */
+export function tidyLayout(doc: Explanation): Explanation {
+  let work: Explanation = {
+    ...doc,
+    steps: doc.steps.map((s) => {
+      if (!s.grid) return s;
+      const { grid: _dropped, ...rest } = s;
+      return rest;
+    }),
+    groups: doc.groups?.map((g) =>
+      g.steps.length > 0 && g.grid ? { ...g, grid: undefined } : g
+    ),
+  };
+
+  const overlap = (a: CellRect, b: CellRect) =>
+    a.minC <= b.maxC && b.minC <= a.maxC && a.minR <= b.maxR && b.minR <= a.maxR;
+
+  for (let iter = 0; iter < 5; iter++) {
+    const pos = layoutPositions(work);
+    const groups = work.groups ?? [];
+    const rects = new Map<string, CellRect>();
+    for (const g of groups) {
+      const r = groupCellRect(g, pos);
+      if (r) rects.set(g.id, r);
+    }
+    const pins = new Map<string, Pos>();
+
+    // 2. separate overlapping member groups
+    const placed: CellRect[] = [];
+    let separated = false;
+    for (const g of groups) {
+      if (g.steps.length === 0) continue;
+      let r = rects.get(g.id);
+      if (!r) continue;
+      let dCol = 0;
+      let guard = 0;
+      while (guard++ < 12) {
+        const shifted = {
+          minC: r.minC + dCol,
+          maxC: r.maxC + dCol,
+          minR: r.minR,
+          maxR: r.maxR,
+        };
+        const hit = placed.find((p) => overlap(shifted, p));
+        if (!hit) break;
+        dCol = hit.maxC - r.minC + 1;
+      }
+      if (dCol > 0 && r.maxC + dCol <= GRID_LIMITS.maxCol) {
+        separated = true;
+        for (const sid of g.steps) {
+          const p = pos.get(sid);
+          if (p) pins.set(sid, { col: p.col + dCol, row: p.row });
+        }
+        r = { ...r, minC: r.minC + dCol, maxC: r.maxC + dCol };
+      }
+      placed.push(r);
+    }
+
+    // 3. evict non-members from any group footprint (after groups settle)
+    if (!separated) {
+      const memberOf = new Map<string, string>();
+      for (const g of groups)
+        for (const sid of g.steps) memberOf.set(sid, g.id);
+      const allRects = [...rects.entries()];
+      const occ = new Set([...pos.values()].map((p) => `${p.col},${p.row}`));
+      for (const s of work.steps) {
+        const p = pos.get(s.id);
+        if (!p) continue;
+        const gid = memberOf.get(s.id);
+        if (!allRects.some(([id, r]) => id !== gid && cellInRect(r, p)))
+          continue;
+        const ok = (c: number, rw: number) =>
+          c >= GRID_LIMITS.minCol &&
+          c <= GRID_LIMITS.maxCol &&
+          rw >= GRID_LIMITS.minRow &&
+          rw <= GRID_LIMITS.maxRow &&
+          !occ.has(`${c},${rw}`) &&
+          !allRects.some(
+            ([id, r]) => id !== gid && cellInRect(r, { col: c, row: rw })
+          );
+        outer: for (let d = 1; d <= 30; d++) {
+          for (let dr = -d; dr <= d; dr++) {
+            for (let dc = -d; dc <= d; dc++) {
+              if (Math.abs(dr) + Math.abs(dc) !== d) continue;
+              const c = p.col + dc;
+              const rw = p.row + dr;
+              if (ok(c, rw)) {
+                pins.set(s.id, { col: c, row: rw });
+                occ.delete(`${p.col},${p.row}`);
+                occ.add(`${c},${rw}`);
+                break outer;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. park colliding empty regions to the right of everything
+    let groupsChanged = false;
+    let newGroups = work.groups;
+    if (!separated && pins.size === 0) {
+      let maxC = 0;
+      for (const p of pos.values()) maxC = Math.max(maxC, p.col);
+      for (const r of rects.values()) maxC = Math.max(maxC, r.maxC);
+      newGroups = groups.map((g) => {
+        if (g.steps.length > 0 || !g.grid) return g;
+        const r = rects.get(g.id);
+        if (!r) return g;
+        const collides =
+          [...pos.values()].some((p) => cellInRect(r, p)) ||
+          [...rects.entries()].some(
+            ([id, o]) => id !== g.id && overlap(r, o)
+          );
+        if (!collides) return g;
+        groupsChanged = true;
+        const grid = {
+          ...g.grid,
+          col: Math.min(maxC + 1, GRID_LIMITS.maxCol - g.grid.cols + 1),
+          row: Math.max(
+            GRID_LIMITS.minRow,
+            Math.min(g.grid.row, GRID_LIMITS.maxRow - g.grid.rows + 1)
+          ),
+        };
+        maxC = grid.col + grid.cols - 1;
+        return { ...g, grid };
+      });
+    }
+
+    if (pins.size === 0 && !groupsChanged) break;
+    work = {
+      ...work,
+      steps: work.steps.map((s) =>
+        pins.has(s.id) ? { ...s, grid: pins.get(s.id)! } : s
+      ),
+      groups: newGroups,
+    };
+  }
+
+  // 5. anchor members at their final cells
+  const finalPos = layoutPositions(work);
+  const memberIds = new Set((work.groups ?? []).flatMap((g) => g.steps));
+  if (memberIds.size) {
+    work = {
+      ...work,
+      steps: work.steps.map((s) => {
+        if (!memberIds.has(s.id) || s.grid) return s;
+        const p = finalPos.get(s.id);
+        return p ? { ...s, grid: { col: p.col, row: p.row } } : s;
+      }),
+    };
+  }
+  return work;
+}
+
 export function worldBounds(pos: Map<string, Pos>) {
   let maxCol = 0;
   let maxRow = 0;
