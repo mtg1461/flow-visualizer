@@ -195,9 +195,7 @@ export function ConnectionScreen({
             {allowLocalPath ? "Drop a JSON file or path" : "Drop a JSON file"}
           </p>
           <p className="mt-1 max-w-[420px] text-[12px] leading-relaxed text-mute">
-            {allowLocalPath
-              ? "Browser file access writes through when available; pasted paths use the local app API."
-              : "Your browser keeps write access to the file you open, so edits save straight back to it."}
+            Edits save straight back to the file you open.
           </p>
         </div>
 
