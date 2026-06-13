@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { Bot, Check, ClipboardCopy, X } from "lucide-react";
-import { SCHEMA_PROMPT } from "@/lib/prompt";
+import {
+  RECEIVE_RESPONSE_PROMPT,
+  WRITE_PROJECT_PROMPT,
+} from "@/lib/prompt";
 
 interface Props {
   open: boolean;
@@ -10,12 +13,16 @@ interface Props {
 }
 
 export function AgentPromptDialog({ open, onClose }: Props) {
+  const [mode, setMode] = useState<"write" | "receive">("write");
   const [copied, setCopied] = useState(false);
 
   if (!open) return null;
 
+  const prompt =
+    mode === "write" ? WRITE_PROJECT_PROMPT : RECEIVE_RESPONSE_PROMPT;
+
   const copyPrompt = async () => {
-    await navigator.clipboard.writeText(SCHEMA_PROMPT);
+    await navigator.clipboard.writeText(prompt);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   };
@@ -57,10 +64,41 @@ export function AgentPromptDialog({ open, onClose }: Props) {
           </button>
         </div>
 
+        <div className="mt-4 grid rounded-xl border border-line bg-well p-1 text-[12.5px] font-medium sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("write");
+              setCopied(false);
+            }}
+            className={`h-9 cursor-pointer rounded-lg px-3 transition-colors ${
+              mode === "write"
+                ? "bg-accent text-bg"
+                : "text-mute hover:bg-surface hover:text-text"
+            }`}
+          >
+            Write into project
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("receive");
+              setCopied(false);
+            }}
+            className={`h-9 cursor-pointer rounded-lg px-3 transition-colors ${
+              mode === "receive"
+                ? "bg-accent text-bg"
+                : "text-mute hover:bg-surface hover:text-text"
+            }`}
+          >
+            Receive response
+          </button>
+        </div>
+
         <textarea
           readOnly
           spellCheck={false}
-          value={SCHEMA_PROMPT}
+          value={prompt}
           className="mt-4 min-h-[320px] flex-1 resize-none rounded-xl border border-line bg-well p-3 font-mono text-[12px] leading-relaxed text-text shadow-inner shadow-black/25 focus:outline-none"
         />
 

@@ -1,6 +1,4 @@
-export const SCHEMA_PROMPT = `Create one JSON file that explains the system as a visual flow. Return only valid JSON, with no markdown or prose.
-
-Use this shape:
+const FLOW_SCHEMA_PROMPT = `Use this shape:
 {
   "title": "How ... works",
   "summary": "One sentence explaining the core mechanism.",
@@ -30,3 +28,15 @@ Rules:
 - Backward "then", backward branches, or "loops" represent retries and feedback.
 - Keep ids stable, lowercase, and unique.
 - Do not include layout or styling fields such as grid, color, or line.`;
+
+export const RECEIVE_RESPONSE_PROMPT = `Create one JSON file that explains the system as a visual flow. Return only valid JSON, with no markdown or prose.
+
+${FLOW_SCHEMA_PROMPT}`;
+
+export const WRITE_PROJECT_PROMPT = `Create one JSON file that explains the system as a visual flow.
+
+Write the JSON file into this project. Prefer a suitable docs location such as docs/<short-topic>-flow.json unless this repository already has a better place for generated documentation or visualizer files. Create the folder if needed. After writing it, respond with the file path only.
+
+${FLOW_SCHEMA_PROMPT}`;
+
+export const SCHEMA_PROMPT = RECEIVE_RESPONSE_PROMPT;
