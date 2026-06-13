@@ -79,13 +79,11 @@ export function HowItWorksDialog({ open, onClose, onOpenAgentPrompt }: Props) {
       />
       <div className="anim-pop relative flex max-h-[85dvh] w-full max-w-[560px] flex-col rounded-2xl border border-line-strong bg-raise p-5 shadow-2xl shadow-black/40">
         <div className="flex shrink-0 items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/15 text-accent">
-              <Workflow size={16} />
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
+              <Workflow size={20} />
             </div>
-            <div>
-              <h2 className="text-[15px] font-medium">How it works</h2>
-            </div>
+            <h2 className="text-[22px] font-medium tracking-tight">How it works</h2>
           </div>
           <button
             type="button"
