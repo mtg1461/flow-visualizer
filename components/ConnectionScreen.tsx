@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Bot,
   FileJson,
+  FilePlus2,
   FolderOpen,
   Sparkles,
   Upload,
@@ -37,6 +38,7 @@ interface Props {
   onConnectPreview: () => void;
   onClearPreview: () => void;
   onBrowse: () => void;
+  onCreateEmpty: () => void;
   onDropConnection: (dataTransfer: DataTransfer) => void;
   onSeeExample: () => void;
   onHowItWorks: () => void;
@@ -51,6 +53,7 @@ export function ConnectionScreen({
   onConnectPreview,
   onClearPreview,
   onBrowse,
+  onCreateEmpty,
   onDropConnection,
   onSeeExample,
   onHowItWorks,
@@ -198,6 +201,27 @@ export function ConnectionScreen({
             Edits save straight back to the file you open.
           </p>
         </div>
+
+        <div className="my-5 flex items-center gap-3" aria-hidden>
+          <span className="h-px flex-1 bg-line" />
+          <span className="text-[10.5px] font-medium uppercase tracking-[0.18em] text-faint">
+            or
+          </span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+
+        <button
+          type="button"
+          onClick={onCreateEmpty}
+          disabled={busy}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-[13px] font-medium text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <FilePlus2 size={15} />
+          Create empty flow
+        </button>
+        <p className="mt-2 text-center text-[11.5px] text-faint">
+          Pick a location to save a new flow file, then start building.
+        </p>
 
         <button
           type="button"

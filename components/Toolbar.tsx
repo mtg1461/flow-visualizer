@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Undo2, Unplug, Wand2 } from "lucide-react";
+import { Bot, Group, Plus, Undo2, Unplug, Wand2 } from "lucide-react";
 import type { FileSyncStatus } from "./ConnectionScreen";
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   status: FileSyncStatus;
   canUndo: boolean;
   onUndo: () => void;
+  onAddStep: () => void;
+  onAddGroup: () => void;
   onTidy: () => void;
   onTitle: (title: string) => void;
   onAgentPrompt: () => void;
@@ -21,6 +23,8 @@ export function Toolbar({
   status,
   canUndo,
   onUndo,
+  onAddStep,
+  onAddGroup,
   onTidy,
   onTitle,
   onAgentPrompt,
@@ -87,6 +91,28 @@ export function Toolbar({
       >
         <Undo2 size={13} />
       </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          title="Add step"
+          aria-label="Add step"
+          onClick={onAddStep}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-raise text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 md:w-auto md:px-3"
+        >
+          <Plus size={13} />
+          <span className="hidden text-[12.5px] md:inline">Step</span>
+        </button>
+        <button
+          type="button"
+          title="Add group"
+          aria-label="Add group"
+          onClick={onAddGroup}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-raise text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 md:w-auto md:px-3"
+        >
+          <Group size={13} />
+          <span className="hidden text-[12.5px] md:inline">Group</span>
+        </button>
+      </div>
       <button
         type="button"
         title="Re-run the automatic layout"

@@ -39,6 +39,8 @@ orthogonal routing live in [lib/graph.ts](lib/graph.ts).
 ## Editing
 
 - Drag tiles to rearrange; **Tidy** re-runs the automatic layout.
+- Use the toolbar **Step** and **Group** buttons to add quickly.
+- Right-click the graph to add at a specific spot or open local actions.
 - Click a tile to edit it; click its port, then another tile, to connect.
 - Click any edge to restyle it — label, line (solid/dashed/dotted), and color.
 - Cluster steps into labeled group regions; give tiles and edges custom colors.

@@ -503,6 +503,69 @@ export function Editor({ initial }: Props) {
     [commit]
   );
 
+  const addGroupFromToolbar = useCallback(() => {
+    const d = docRef.current;
+    const pos = layoutPositions(d);
+    const existing = d.groups ?? [];
+    const otherRects = existing
+      .map((g) => groupCellRect(g, pos))
+      .filter((r): r is CellRect => !!r);
+
+    if (selection?.kind === "step") {
+      const stepCell = pos.get(selection.id);
+      const alreadyGrouped = existing.some((g) => g.steps.includes(selection.id));
+      if (stepCell && !alreadyGrouped) {
+        let n = existing.length + 1;
+        while (existing.some((g) => g.id === `group-${n}`)) n++;
+        const id = `group-${n}`;
+        const candidate = { id, label: `Group ${n}`, steps: [selection.id] };
+        const rect = groupCellRect(candidate, pos);
+        if (rect && !otherRects.some((o) => rectsOverlap(rect, o))) {
+          commit({ ...d, groups: [...existing, candidate] });
+          setSelection({ kind: "group", id });
+          return;
+        }
+      }
+    }
+
+    if (selection?.kind === "group") {
+      const group = existing.find((g) => g.id === selection.id);
+      const rect = group ? groupCellRect(group, pos) : null;
+      if (rect) {
+        addGroupAt({
+          col: Math.min(GRID_LIMITS.maxCol - 1, rect.maxC + 1),
+          row: Math.min(GRID_LIMITS.maxRow - 1, rect.minR),
+        });
+        return;
+      }
+    }
+
+    if (selection?.kind === "step") {
+      const stepCell = pos.get(selection.id);
+      if (stepCell) {
+        addGroupAt({
+          col: Math.min(GRID_LIMITS.maxCol - 1, stepCell.col + 1),
+          row: Math.min(GRID_LIMITS.maxRow - 1, stepCell.row),
+        });
+        return;
+      }
+    }
+
+    const cells = [...pos.values()];
+    const minCol = cells.reduce(
+      (acc, cell) => Math.min(acc, cell.col),
+      cells[0]?.col ?? 0
+    );
+    const maxRow = cells.reduce(
+      (acc, cell) => Math.max(acc, cell.row),
+      cells[0]?.row ?? 0
+    );
+    addGroupAt({
+      col: Math.min(GRID_LIMITS.maxCol - 1, minCol),
+      row: Math.min(GRID_LIMITS.maxRow - 1, maxRow + 1),
+    });
+  }, [addGroupAt, commit, selection]);
+
   const completeConnect = useCallback(
     (to: string) => {
       const from = connectFrom;
@@ -746,6 +809,7 @@ export function Editor({ initial }: Props) {
           onConnectPreview={fileConnection.connectPending}
           onClearPreview={fileConnection.clearPreview}
           onBrowse={fileConnection.browseFile}
+          onCreateEmpty={fileConnection.createEmpty}
           onDropConnection={fileConnection.connectDropped}
           onSeeExample={fileConnection.loadExample}
           onHowItWorks={() => setHowItWorksOpen(true)}
@@ -775,6 +839,8 @@ export function Editor({ initial }: Props) {
         status={fileConnection.status}
         canUndo={canUndo}
         onUndo={undo}
+        onAddStep={() => addStep()}
+        onAddGroup={addGroupFromToolbar}
         onTidy={tidy}
         onTitle={(title) => commit({ ...doc, title }, "doc:title")}
         onAgentPrompt={() => setAgentPromptOpen(true)}

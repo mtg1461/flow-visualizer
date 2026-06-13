@@ -16,6 +16,12 @@ import { LOCAL_FILES_ENABLED } from "@/lib/config";
  *  on a hosted build. Browser-handle connections aren't restorable here. */
 const LAST_PATH_KEY = "flow-visualizer:lastPath";
 
+/** Starter document written when the user creates a new empty flow. */
+const EMPTY_FLOW: Explanation = {
+  title: "Untitled flow",
+  steps: [{ id: "step-1", title: "New step", kind: "process" }],
+};
+
 function rememberPath(p: string) {
   if (!LOCAL_FILES_ENABLED) return;
   try {
@@ -87,6 +93,7 @@ type PendingConnection =
 declare global {
   interface Window {
     showOpenFilePicker?: (options?: unknown) => Promise<BrowserFileHandle[]>;
+    showSaveFilePicker?: (options?: unknown) => Promise<BrowserFileHandle>;
   }
 
   interface DataTransferItem {
@@ -424,6 +431,42 @@ export function useFileConnection({
     }
   }, [previewBrowserHandle]);
 
+  // Create a new flow: the user picks a location (which grants write
+  // permission), we seed it with a starter doc, then connect to it.
+  const createEmpty = useCallback(async () => {
+    if (!window.showSaveFilePicker) {
+      setError("Creating a file needs browser file access (a Chromium-based browser).");
+      setStatus("error");
+      return;
+    }
+    setError(null);
+    setStatus("loading");
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "flow.json",
+        types: [
+          { description: "JSON files", accept: { "application/json": [".json"] } },
+        ],
+      });
+      if (!isBrowserFileHandle(handle) || !handle.createWritable)
+        throw new Error("This browser cannot write to the chosen file.");
+      const writable = await handle.createWritable();
+      await writable.write(`${serializeDoc(EMPTY_FLOW)}\n`);
+      await writable.close();
+      setPathState("");
+      await connectBrowserHandle(handle);
+    } catch (createError) {
+      const name = createError instanceof Error ? createError.name : "";
+      if (name === "AbortError") return; // user dismissed the picker
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Could not create the file."
+      );
+      setStatus("error");
+    }
+  }, [connectBrowserHandle]);
+
   const connectDropped = useCallback(
     async (dataTransfer: DataTransfer) => {
       const fileItems = [...dataTransfer.items].filter(
@@ -701,6 +744,7 @@ export function useFileConnection({
     setPath,
     clearPreview,
     browseFile,
+    createEmpty,
     connectDropped,
     connectPending,
     loadExample,

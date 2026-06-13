@@ -1106,7 +1106,7 @@ export function Canvas({
 
       {/* hint */}
       <div className="pointer-events-none absolute bottom-5 left-4 hidden text-[11.5px] text-mute md:block">
-        right-click for actions
+        Right-click the graph for more options
       </div>
     </div>
   );
