@@ -7,10 +7,10 @@ import {
   Bot,
   FileJson,
   FolderOpen,
-  Link2,
   Sparkles,
   Upload,
 } from "lucide-react";
+import { FlowMark } from "./FlowMark";
 
 export type FileSyncStatus =
   | "idle"
@@ -136,10 +136,8 @@ export function ConnectionScreen({
     <main className="flex h-dvh items-center justify-center bg-bg p-5">
       <section className="anim-pop w-full max-w-[720px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
-              <Link2 size={18} />
-            </div>
+          <div className="flex items-center gap-3.5">
+            <FlowMark size={52} className="shrink-0" />
             <div>
               <h1 className="text-[18px] font-semibold">Connect Flow File</h1>
               <p className="mt-0.5 text-[12.5px] text-mute">
