@@ -1,40 +1,41 @@
-const FLOW_SCHEMA_PROMPT = `Use this shape:
+const FLOW_SCHEMA_PROMPT = `Model the system as a directed graph of steps — not a linear checklist. Capture its real shape: forks where the path diverges, merges where paths rejoin, and feedback where a later step changes something earlier.
+
+Use this JSON shape (output valid JSON only — no comments, no trailing commas):
 {
-  "title": "How ... works",
-  "summary": "One sentence explaining the core mechanism.",
+  "title": "How <subject> works",
+  "summary": "One sentence naming the core mechanism.",
   "actors": [
-    { "id": "short-slug", "name": "Actor name", "role": "what it controls or provides" }
+    { "id": "short-slug", "name": "Actor name", "role": "what it owns or decides" }
   ],
   "steps": [
     {
       "id": "short-slug",
-      "title": "Short action label",
+      "title": "Short verb phrase",
       "detail": "One or two plain sentences: what happens and why it matters downstream.",
       "kind": "input | process | decision | output | wait",
       "actor": "actor-id",
-      "branches": [{ "when": "condition", "to": "step-id" }],
+      "branches": [{ "when": "condition in plain words", "to": "step-id" }],
       "then": "step-id"
     }
   ],
   "loops": [{ "from": "step-id", "to": "step-id", "label": "what feeds back" }],
-  "groups": [{ "id": "short-slug", "label": "Subsystem name", "steps": ["step-id"] }]
+  "groups": [{ "id": "short-slug", "label": "Phase or subsystem", "steps": ["step-id"] }]
 }
 
-Rules:
-- Use 5 to 12 ordered steps for the main path.
-- Use "input" for the starting trigger and "output" for the final result.
-- Use "decision" plus 2 or 3 branches for real forks.
-- Use "then" only when the next step is not simply the following item.
-- Backward "then", backward branches, or "loops" represent retries and feedback.
-- Keep ids stable, lowercase, and unique.
-- Do not include layout or styling fields such as grid, color, or line.`;
+How to model it well:
+- Steps flow to the next listed step automatically — omit "then" for plain sequence. Set "then" only to jump elsewhere: skip ahead, merge two paths into one step, or loop back.
+- Make decisions real forks: "kind": "decision" with 2-3 mutually exclusive "branches", each leading to a DIFFERENT step so the paths actually diverge. Let those paths run a few steps, then rejoin with a shared "then" if they merge. A step that always continues to one place is a process, not a decision.
+- Use "loops" (or a backward "then"/branch) only for genuine feedback — a later outcome that revises earlier state. One or two is normal; do not wire a loop from every step.
+- "input" is the trigger, "output" the result, "wait" pauses for an external event; everything else is "process". Give each step the actor that performs it.
+- Cluster related steps into "groups" by phase or subsystem when two or more belong together.
+- Keep it tight and honest: roughly 6-14 steps, stable lowercase unique ids, every referenced id present, no orphan steps. Omit layout and styling fields (grid, color, line) — the tool adds those.`;
 
-export const RECEIVE_RESPONSE_PROMPT = `Create one JSON file that explains the system as a visual flow. Return only valid JSON, with no markdown or prose.
+export const RECEIVE_RESPONSE_PROMPT = `Explain how the system works as one visual flow. Return only valid JSON — no markdown fences, no prose.
 
 ${FLOW_SCHEMA_PROMPT}`;
 
-export const WRITE_PROJECT_PROMPT = `Create one JSON file that explains the system as a visual flow.
+export const WRITE_PROJECT_PROMPT = `Explain how the system works as one visual flow, saved as a JSON file in this project.
 
-Write the JSON file into this project. Prefer a suitable docs location such as docs/<short-topic>-flow.json unless this repository already has a better place for generated documentation or visualizer files. Create the folder if needed. After writing it, respond with the file path only.
+Write it to docs/<short-topic>-flow.json (create the folder if needed) unless the repo already has a better place for generated docs. After writing, reply with just the file path.
 
 ${FLOW_SCHEMA_PROMPT}`;
