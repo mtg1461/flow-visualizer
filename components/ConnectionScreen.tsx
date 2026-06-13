@@ -8,6 +8,7 @@ import {
   FileJson,
   FolderOpen,
   Link2,
+  Sparkles,
   Upload,
 } from "lucide-react";
 
@@ -18,7 +19,8 @@ export type FileSyncStatus =
   | "saving"
   | "saved"
   | "external"
-  | "error";
+  | "error"
+  | "example";
 
 export interface ConnectionPreview {
   sourceName: string;
@@ -37,6 +39,7 @@ interface Props {
   onClearPreview: () => void;
   onBrowse: () => void;
   onDropConnection: (dataTransfer: DataTransfer) => void;
+  onSeeExample: () => void;
   onAgentPrompt: () => void;
 }
 
@@ -53,6 +56,7 @@ export function ConnectionScreen({
   onClearPreview,
   onBrowse,
   onDropConnection,
+  onSeeExample,
   onAgentPrompt,
 }: Props) {
   const [over, setOver] = useState(false);
@@ -208,6 +212,19 @@ export function ConnectionScreen({
               : "Your browser keeps write access to the file you open, so edits save straight back to it."}
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={onSeeExample}
+          disabled={busy}
+          className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/15 px-4 py-3 text-[13px] font-medium text-accent transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-accent/25 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Sparkles size={15} />
+          See an example flow
+        </button>
+        <p className="mt-2 text-center text-[11.5px] text-faint">
+          Opens a sample you can pan, zoom, and edit — nothing saves to a file.
+        </p>
 
         {error && (
           <p className="mt-3 flex items-start gap-2 text-[12.5px] leading-snug text-rose">

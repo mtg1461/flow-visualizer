@@ -772,6 +772,7 @@ export function Editor({ initial }: Props) {
           onClearPreview={fileConnection.clearPreview}
           onBrowse={fileConnection.browseFile}
           onDropConnection={fileConnection.connectDropped}
+          onSeeExample={fileConnection.loadExample}
           onAgentPrompt={() => setAgentPromptOpen(true)}
         />
         <AgentPromptDialog

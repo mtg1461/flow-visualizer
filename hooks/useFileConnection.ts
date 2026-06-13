@@ -166,13 +166,17 @@ export function useFileConnection({
     useState<BrowserFileConnection | null>(null);
   const [status, setStatus] = useState<FileSyncStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  // demo mode: the canvas is open on the built-in example with no file bound,
+  // so nothing saves back to disk and nothing is polled.
+  const [exampleMode, setExampleMode] = useState(false);
 
   const lastFileJson = useRef(serializeDoc(doc));
   const saveTimer = useRef<number | null>(null);
   const readingFile = useRef(false);
 
-  const connected = !!boundFile || !!browserFile;
-  const connectionName = boundFile?.path ?? browserFile?.name ?? "";
+  const connected = !!boundFile || !!browserFile || exampleMode;
+  const connectionName =
+    boundFile?.path ?? browserFile?.name ?? (exampleMode ? "Example flow" : "");
   const preview = useMemo(
     () =>
       pendingConnection
@@ -518,6 +522,36 @@ export function useFileConnection({
     }
   }, [commit, onConnected, pendingConnection, requestBrowserWrite, settleStatus]);
 
+  // Open the canvas on the built-in example, fetched from the server, with no
+  // file bound. Edits live in localStorage but never write back to disk.
+  const loadExample = useCallback(async () => {
+    setError(null);
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/example", { cache: "no-store" });
+      if (!res.ok) throw new Error("Could not load the example flow.");
+      const result = parseExplanation(await res.text());
+      if (!result.ok) throw new Error(result.error);
+      const next = resolveGroupConflicts(normalize(result.data));
+      lastFileJson.current = serializeDoc(next);
+      setBoundFile(null);
+      setBrowserFile(null);
+      setPendingConnection(null);
+      forgetPath();
+      setExampleMode(true);
+      commit(next, undefined, false);
+      onConnected();
+      setStatus("example");
+    } catch (exampleError) {
+      setError(
+        exampleError instanceof Error
+          ? exampleError.message
+          : "Could not load the example flow."
+      );
+      setStatus("error");
+    }
+  }, [commit, onConnected]);
+
   useEffect(() => {
     if ((!boundFile && !browserFile) || readingFile.current) return;
     const contents = serializeDoc(doc);
@@ -649,6 +683,7 @@ export function useFileConnection({
     }
     setBoundFile(null);
     setBrowserFile(null);
+    setExampleMode(false);
     setStatus("idle");
     setError(null);
     setPendingConnection(null);
@@ -668,6 +703,7 @@ export function useFileConnection({
     browseFile,
     connectDropped,
     connectPending,
+    loadExample,
     disconnect,
   };
 }

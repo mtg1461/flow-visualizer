@@ -28,15 +28,17 @@ export function Toolbar({
 }: Props) {
   const active = status === "watching" || status === "saved";
   const statusLabel =
-    status === "saving"
-      ? "Saving"
-      : status === "external"
-        ? "Reloaded"
-        : status === "error"
-          ? "Issue"
-          : active
-            ? "Connected"
-            : "Connecting";
+    status === "example"
+      ? "Example"
+      : status === "saving"
+        ? "Saving"
+        : status === "external"
+          ? "Reloaded"
+          : status === "error"
+            ? "Issue"
+            : active
+              ? "Connected"
+              : "Connecting";
 
   return (
     <header className="anim-toolbar z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line-strong bg-surface px-3.5">
@@ -47,7 +49,9 @@ export function Toolbar({
               ? "bg-rose"
               : status === "saving"
                 ? "bg-amber"
-                : "bg-teal"
+                : status === "example"
+                  ? "bg-accent"
+                  : "bg-teal"
           }`}
         />
         <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-faint">
