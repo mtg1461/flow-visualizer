@@ -20,7 +20,8 @@ npm run dev   # http://localhost:3000 by default
 - The app opens to a connection screen. Enter a path, browse, or drag/drop a
   JSON file to preview it; then **Connect** to open the canvas. Try
   `examples\live-flow.json`, or an absolute path like
-  `C:\Projects\other-project\flow.json`.
+  `C:\Projects\other-project\flow.json`. (The **Local path** field is a
+  local-only convenience — see *Hosting* below.)
 - **Copy Prompt** (toolbar) gives an agent the JSON contract for creating a
   flow file. Try [examples/thermostat.json](examples/thermostat.json).
 - Drag tiles to rearrange (positions persist via the optional `grid` field).
@@ -43,6 +44,21 @@ npm run dev   # http://localhost:3000 by default
 
 The data shape is `Explanation` in [lib/types.ts](lib/types.ts). Layout,
 edge-building, and orthogonal routing live in [lib/graph.ts](lib/graph.ts).
+
+## Hosting
+
+Deploys as a standard Next.js app (e.g. Vercel) with no configuration.
+
+The **Local path** field and the `/api/file/*` routes read and write files on
+the machine running the server, so they only make sense — and are only safe —
+when that machine is your own. They are **disabled in production builds**: a
+hosted instance returns 403 from those routes and the connection screen leads
+with **Browse** / drag-and-drop instead, using the browser's File System Access
+API (Chromium-based browsers), which keeps write-back to the file you choose.
+
+To run a *local* production build (`npm run build && npm start`) with path
+access restored, set `NEXT_PUBLIC_UNFOLD_LOCAL_FILES=1`. Do not set it on a
+shared deployment — there is no auth or directory confinement behind the gate.
 
 ## Canvas rules
 

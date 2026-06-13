@@ -30,6 +30,8 @@ interface Props {
   status: FileSyncStatus;
   error: string | null;
   preview: ConnectionPreview | null;
+  /** Whether the local-disk path field applies (off on a hosted build). */
+  allowLocalPath: boolean;
   onPathChange: (path: string) => void;
   onConnectPreview: () => void;
   onClearPreview: () => void;
@@ -45,6 +47,7 @@ export function ConnectionScreen({
   status,
   error,
   preview,
+  allowLocalPath,
   onPathChange,
   onConnectPreview,
   onClearPreview,
@@ -152,20 +155,22 @@ export function ConnectionScreen({
 
         <div className="mt-6">
           <label className="block text-[11px] font-medium uppercase tracking-[0.08em] text-faint">
-            Local path
+            {allowLocalPath ? "Local path" : "Open a file"}
           </label>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-well px-3 py-2 focus-within:border-accent/60">
-              <FileJson size={14} className="shrink-0 text-accent" />
-              <input
-                aria-label="Local path"
-                value={path}
-                onChange={(e) => onPathChange(e.target.value)}
-                spellCheck={false}
-                placeholder={EXAMPLE_PATH}
-                className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-text placeholder:text-faint focus:outline-none"
-              />
-            </div>
+            {allowLocalPath && (
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-well px-3 py-2 focus-within:border-accent/60">
+                <FileJson size={14} className="shrink-0 text-accent" />
+                <input
+                  aria-label="Local path"
+                  value={path}
+                  onChange={(e) => onPathChange(e.target.value)}
+                  spellCheck={false}
+                  placeholder={EXAMPLE_PATH}
+                  className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-text placeholder:text-faint focus:outline-none"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -195,11 +200,12 @@ export function ConnectionScreen({
         >
           <Upload size={20} className="text-accent" />
           <p className="mt-3 text-[13px] font-medium text-text">
-            Drop a JSON file or path
+            {allowLocalPath ? "Drop a JSON file or path" : "Drop a JSON file"}
           </p>
           <p className="mt-1 max-w-[420px] text-[12px] leading-relaxed text-mute">
-            Browser file access writes through when available; pasted paths use
-            the local app API.
+            {allowLocalPath
+              ? "Browser file access writes through when available; pasted paths use the local app API."
+              : "Your browser keeps write access to the file you open, so edits save straight back to it."}
           </p>
         </div>
 

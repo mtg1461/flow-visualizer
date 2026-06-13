@@ -56,19 +56,32 @@ overlap tiles. Browser screenshots from the preview webview are unreliable
 (hidden visibility throttles rAF/timers); prefer geometric assertions or
 `preview_eval`.
 
-## Security posture of the disk API
+## Disk API & hosting posture
 
 `app/api/file/{read,stat,write}` resolve client-supplied **absolute** paths on
 purpose — Unfold is a local single-user tool and the point is to open a flow
-file anywhere on your machine. Guards in place: only `.json` paths are touched
+file anywhere on your machine. Guards: only `.json` paths are touched
 (`resolveLocalPath` in `_shared.ts`), reads/writes are capped at
-`MAX_FILE_BYTES` (8 MB), and `npm run dev` binds to `127.0.0.1` so the API is
-not network-reachable in development. This is intentionally NOT safe for a
-shared/hosted deployment: there is no auth and no root confinement. Before
-hosting for multiple users, either gate these routes behind auth + a
-root-directory check, or drop the disk API entirely and rely on the browser
-File System Access path (`useFileConnection` already supports `createWritable`
-handles, which never touch this API).
+`MAX_FILE_BYTES` (8 MB), and `npm run dev` binds to `127.0.0.1`.
+
+**The disk API is gated off in production** (`LOCAL_FILES_ENABLED` in
+`lib/config.ts`, default-deny when `NODE_ENV === "production"`). On a hosted
+build (e.g. Vercel) the three routes return 403 and the connection screen
+hides the path field — users open files through the browser File System Access
+path instead (`useFileConnection` `createWritable` handles, which never touch
+this API and are write-capable; Chromium-only). `LOCAL_FILES_ENABLED` is the
+single source of truth, read by both the server routes and the client
+(ConnectionScreen UI, drop-path branch, dev-only path auto-reconnect). To run a
+**local production build** with path access, set
+`NEXT_PUBLIC_UNFOLD_LOCAL_FILES=1` (re-enables both API and UI). Never set it on
+a shared deployment — there is still no auth or root confinement behind the
+gate.
+
+Known hosted gaps (deliberately not yet built): browser-handle connections are
+not restored across a refresh (would need IndexedDB + a permission re-prompt);
+non-Chromium browsers can't load a file at all on a hosted build (no
+`showOpenFilePicker`/`getAsFileSystemHandle`) — a read-only `<input type=file>`
+fallback would close that.
 
 ## Gotchas
 

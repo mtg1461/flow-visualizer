@@ -9,6 +9,29 @@ import {
   normalize,
   resolveGroupConflicts,
 } from "@/lib/graph";
+import { LOCAL_FILES_ENABLED } from "@/lib/config";
+
+/** Remembers the last connected disk path so a dev refresh reconnects.
+ *  Path connections only exist when LOCAL_FILES_ENABLED, so this is inert
+ *  on a hosted build. Browser-handle connections aren't restorable here. */
+const LAST_PATH_KEY = "unfold:lastPath";
+
+function rememberPath(p: string) {
+  if (!LOCAL_FILES_ENABLED) return;
+  try {
+    localStorage.setItem(LAST_PATH_KEY, p);
+  } catch {
+    // storage unavailable — reconnect-on-refresh simply won't happen
+  }
+}
+
+function forgetPath() {
+  try {
+    localStorage.removeItem(LAST_PATH_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 interface LocalFileRead {
   path: string;
@@ -281,6 +304,7 @@ export function useFileConnection({
           size: data.size,
         });
         setBrowserFile(null);
+        rememberPath(data.path);
         commit(next, undefined, false);
         onConnected();
         settleStatus(source === "watch" ? "external" : "watching");
@@ -297,6 +321,25 @@ export function useFileConnection({
     },
     [commit, onConnected, path, settleStatus]
   );
+
+  // Reconnect the last disk path after a refresh (a dev Fast-Refresh full
+  // reload otherwise drops the connection silently). Path connections only
+  // exist in local dev, so this never runs on a hosted build. Runs once.
+  const loadPathRef = useRef(loadPath);
+  loadPathRef.current = loadPath;
+  const triedReconnect = useRef(false);
+  useEffect(() => {
+    if (triedReconnect.current || !LOCAL_FILES_ENABLED) return;
+    triedReconnect.current = true;
+    let saved = "";
+    try {
+      saved = localStorage.getItem(LAST_PATH_KEY) ?? "";
+    } catch {
+      saved = "";
+    }
+    if (saved) loadPathRef.current(saved, "manual");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const connectBrowserHandle = useCallback(
     async (
@@ -401,7 +444,11 @@ export function useFileConnection({
         setStatus("error");
         return;
       }
-      if (text && (text.endsWith(".json") || text.includes("\\") || text.includes("/"))) {
+      if (
+        LOCAL_FILES_ENABLED &&
+        text &&
+        (text.endsWith(".json") || text.includes("\\") || text.includes("/"))
+      ) {
         setPathState(text);
         await previewPath(text);
         return;
@@ -446,6 +493,7 @@ export function useFileConnection({
           size: pendingConnection.size,
         });
         setBrowserFile(null);
+        rememberPath(pendingConnection.path);
       } else {
         await requestBrowserWrite(pendingConnection.handle);
         setBoundFile(null);
@@ -526,8 +574,14 @@ export function useFileConnection({
           path: boundFile.path,
         });
         if (!alive) return;
-        if (Math.abs(data.mtimeMs - boundFile.mtimeMs) > 1)
+        if (Math.abs(data.mtimeMs - boundFile.mtimeMs) > 1) {
           await loadPath(boundFile.path, "watch");
+        } else {
+          // a clean poll clears a stale transient error (e.g. the dev server
+          // was momentarily restarting), so the toolbar leaves "Issue"
+          setStatus((s) => (s === "error" ? "watching" : s));
+          setError((e) => (e ? null : e));
+        }
       } catch (watchError) {
         if (!alive) return;
         setError(
@@ -553,8 +607,12 @@ export function useFileConnection({
       try {
         const file = await browserFile.handle.getFile();
         if (!alive) return;
-        if (Math.abs(file.lastModified - browserFile.lastModified) > 1)
+        if (Math.abs(file.lastModified - browserFile.lastModified) > 1) {
           await connectBrowserHandle(browserFile.handle, "watch");
+        } else {
+          setStatus((s) => (s === "error" ? "watching" : s));
+          setError((e) => (e ? null : e));
+        }
       } catch (watchError) {
         if (!alive) return;
         setError(
@@ -594,6 +652,7 @@ export function useFileConnection({
     setStatus("idle");
     setError(null);
     setPendingConnection(null);
+    forgetPath();
     onDisconnected();
   }, [onDisconnected]);
 

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { LOCAL_FILES_ENABLED } from "@/lib/config";
 
 /** Upper bound on any flow file the disk API will read or write (8 MB).
  *  A flow document is a few KB; this only exists to stop the endpoint from
@@ -47,5 +48,18 @@ export function errorResponse(error: unknown, status = 400) {
             : "File operation failed.",
     },
     status
+  );
+}
+
+/**
+ * Guard for the disk routes. On a hosted/production build the disk API is
+ * off by default (see lib/config.ts) — it is meaningless and unsafe there.
+ * Returns a ready 403 response when disabled, or null to proceed.
+ */
+export function localFilesDisabledResponse() {
+  if (LOCAL_FILES_ENABLED) return null;
+  return errorResponse(
+    "Local file access is disabled on this deployment. Drag in a JSON file or use Browse instead.",
+    403
   );
 }

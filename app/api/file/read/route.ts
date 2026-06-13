@@ -3,6 +3,7 @@ import {
   MAX_FILE_BYTES,
   errorResponse,
   jsonNoStore,
+  localFilesDisabledResponse,
   resolveLocalPath,
 } from "../_shared";
 
@@ -10,6 +11,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const disabled = localFilesDisabledResponse();
+  if (disabled) return disabled;
   try {
     const body = await request.json();
     const filePath = resolveLocalPath(body.path);

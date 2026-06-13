@@ -25,6 +25,7 @@ import { DisconnectDialog } from "./DisconnectDialog";
 import { AgentPromptDialog } from "./AgentPromptDialog";
 import { useEditorHistory } from "@/hooks/useEditorHistory";
 import { useFileConnection } from "@/hooks/useFileConnection";
+import { LOCAL_FILES_ENABLED } from "@/lib/config";
 
 interface Props {
   initial: Explanation;
@@ -765,6 +766,7 @@ export function Editor({ initial }: Props) {
           status={fileConnection.status}
           error={fileConnection.error}
           preview={fileConnection.preview}
+          allowLocalPath={LOCAL_FILES_ENABLED}
           onPathChange={fileConnection.setPath}
           onConnectPreview={fileConnection.connectPending}
           onClearPreview={fileConnection.clearPreview}
