@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Unfold — a tile-based 2D flow editor for AI-agent explanations. Next.js 15
+Flow Visualizer — a tile-based 2D flow editor for AI-agent explanations. Next.js 15
 (App Router) · TypeScript · Tailwind v4 · lucide-react. No graph/canvas
 library: tiles are absolutely-positioned divs over one SVG edge layer inside
 a single pan/zoom transform. Animations are CSS-only (framer-motion was
@@ -59,7 +59,7 @@ overlap tiles. Browser screenshots from the preview webview are unreliable
 ## Disk API & hosting posture
 
 `app/api/file/{read,stat,write}` resolve client-supplied **absolute** paths on
-purpose — Unfold is a local single-user tool and the point is to open a flow
+purpose — Flow Visualizer is a local single-user tool and the point is to open a flow
 file anywhere on your machine. Guards: only `.json` paths are touched
 (`resolveLocalPath` in `_shared.ts`), reads/writes are capped at
 `MAX_FILE_BYTES` (8 MB), and `npm run dev` binds to `127.0.0.1`.
@@ -73,7 +73,7 @@ this API and are write-capable; Chromium-only). `LOCAL_FILES_ENABLED` is the
 single source of truth, read by both the server routes and the client
 (ConnectionScreen UI, drop-path branch, dev-only path auto-reconnect). To run a
 **local production build** with path access, set
-`NEXT_PUBLIC_UNFOLD_LOCAL_FILES=1` (re-enables both API and UI). Never set it on
+`NEXT_PUBLIC_FLOW_VISUALIZER_LOCAL_FILES=1` (re-enables both API and UI). Never set it on
 a shared deployment — there is still no auth or root confinement behind the
 gate.
 
@@ -87,7 +87,7 @@ fallback would close that.
 
 - Windows repo: never bulk-edit sources via PowerShell `Get-Content`/
   `Set-Content` pipelines — it mangles UTF-8. Use proper edit tooling.
-- localStorage key is `unfold:data`; the app opens a connection screen
+- localStorage key is `flow-visualizer:data`; the app opens a connection screen
   unless a document is present.
 - Grid coordinates can be negative (`GRID_LIMITS`: cols −12..60, rows
   −24..120); don't assume 0-origin.

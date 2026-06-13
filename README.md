@@ -1,4 +1,4 @@
-# Unfold
+# Flow Visualizer
 
 A tile-based 2D flow editor for AI-agent explanations. Paste an agent's
 structured JSON description of how something works and it renders as an
@@ -57,7 +57,7 @@ with **Browse** / drag-and-drop instead, using the browser's File System Access
 API (Chromium-based browsers), which keeps write-back to the file you choose.
 
 To run a *local* production build (`npm run build && npm start`) with path
-access restored, set `NEXT_PUBLIC_UNFOLD_LOCAL_FILES=1`. Do not set it on a
+access restored, set `NEXT_PUBLIC_FLOW_VISUALIZER_LOCAL_FILES=1`. Do not set it on a
 shared deployment — there is no auth or directory confinement behind the gate.
 
 ## Canvas rules

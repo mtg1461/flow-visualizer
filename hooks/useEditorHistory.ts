@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { Explanation } from "@/lib/types";
 
-export const STORAGE_KEY = "unfold:data";
+export const STORAGE_KEY = "flow-visualizer:data";
 
 const HISTORY_LIMIT = 100;
 const COALESCE_MS = 1000;

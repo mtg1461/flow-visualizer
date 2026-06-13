@@ -14,7 +14,7 @@ import { LOCAL_FILES_ENABLED } from "@/lib/config";
 /** Remembers the last connected disk path so a dev refresh reconnects.
  *  Path connections only exist when LOCAL_FILES_ENABLED, so this is inert
  *  on a hosted build. Browser-handle connections aren't restorable here. */
-const LAST_PATH_KEY = "unfold:lastPath";
+const LAST_PATH_KEY = "flow-visualizer:lastPath";
 
 function rememberPath(p: string) {
   if (!LOCAL_FILES_ENABLED) return;

@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "unfold-dev",
+      "name": "flow-visualizer-dev",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev"],
       "autoPort": true
