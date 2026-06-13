@@ -251,7 +251,7 @@ export function Editor({ initial }: Props) {
             })
           : undefined;
       // membership changes only when the drag CROSSES a region boundary,
-      // so manual assignments made in the inspector stick
+      // so nudging a tile within its own group never toggles it
       const newG = containing(cell);
       const oldG = containing(oldCell);
       let groups = d.groups;
@@ -671,31 +671,6 @@ export function Editor({ initial }: Props) {
             s.actor === id ? { ...s, actor: undefined } : s
           ),
         });
-      },
-      assignGroup: (stepId, groupId) => {
-        const d = docRef.current;
-        const pos = layoutPositions(d);
-        let groups = (d.groups ?? []).map((g) => {
-          if (!g.steps.includes(stepId)) return g;
-          const steps = g.steps.filter((s) => s !== stepId);
-          // keep the region when the last member is removed by hand
-          if (steps.length === 0 && !g.grid && g.id !== groupId) {
-            const rect = groupCellRect(g, pos);
-            return { ...g, steps, grid: rect ? rectToGrid(rect) : undefined };
-          }
-          return { ...g, steps };
-        });
-        if (groupId === "__new__") {
-          let n = groups.length + 1;
-          while (groups.some((g) => g.id === `group-${n}`)) n++;
-          groups.push({ id: `group-${n}`, label: `Group ${n}`, steps: [stepId] });
-        } else if (groupId) {
-          groups = groups.map((g) =>
-            g.id === groupId ? { ...g, steps: [...g.steps, stepId] } : g
-          );
-        }
-        const kept = groups.filter((g) => g.steps.length > 0 || g.grid);
-        commit({ ...d, groups: kept.length ? kept : undefined });
       },
       updateGroup: (id, patch) => {
         const d = docRef.current;

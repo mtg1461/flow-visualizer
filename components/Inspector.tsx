@@ -33,8 +33,6 @@ export interface EditorActions {
   addActor: (name: string) => void;
   updateActor: (id: string, patch: { name?: string; role?: string }) => void;
   deleteActor: (id: string) => void;
-  /** groupId, existing group id, or "__new__"; null removes membership. */
-  assignGroup: (stepId: string, groupId: string | null) => void;
   updateGroup: (
     id: string,
     patch: Partial<Pick<Group, "label" | "color" | "grid">>
@@ -519,19 +517,14 @@ function GroupPanel({
         Members <span className="normal-case tracking-normal">({group.steps.length})</span>
       </span>
       <div className="space-y-1">
-        {group.steps.map((id) => (
-          <div key={id} className="flex items-center gap-1.5 text-[12px]">
-            <span className="w-0 flex-1 truncate text-text/85">
-              {truncate(titleOf.get(id) ?? id, 32)}
+        {group.steps.map((id, i) => (
+          <div key={id} className="flex items-baseline gap-2 text-[12px]">
+            <span className="w-4 shrink-0 text-right text-[11px] tabular-nums text-faint">
+              {i + 1}
             </span>
-            <button
-              type="button"
-              aria-label={`Remove ${titleOf.get(id) ?? id} from group`}
-              onClick={() => actions.assignGroup(id, null)}
-              className="cursor-pointer p-1 text-faint transition-colors hover:text-rose"
-            >
-              <Trash2 size={11} />
-            </button>
+            <span className="min-w-0 flex-1 truncate text-text/85">
+              {truncate(titleOf.get(id) ?? id, 34)}
+            </span>
           </div>
         ))}
         {group.steps.length === 0 && (
@@ -544,7 +537,7 @@ function GroupPanel({
       <p className="mt-5 border-t border-line pt-3.5 text-[11px] leading-relaxed text-faint">
         Drag the region to move it with its members — Alt-drag to move the
         box alone. Drag the corner handle to resize. Tiles dragged across the
-        boundary join or leave; assignments made here always stick.
+        boundary join or leave the group.
       </p>
     </div>
   );
