@@ -7,7 +7,7 @@ import { parseExplanation } from "@/lib/parse";
 import {
   denormalize,
   normalize,
-  resolveGroupConflicts,
+  tidyLayout,
 } from "@/lib/graph";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
 
@@ -221,7 +221,7 @@ export function useFileConnection({
       const data = await postFileApi<LocalFileRead>("read", { path: wanted });
       const result = parseExplanation(data.contents);
       if (!result.ok) throw new Error(result.error);
-      const normalized = resolveGroupConflicts(normalize(result.data));
+      const normalized = tidyLayout(normalize(result.data));
       setPendingConnection({
         ...data,
         kind: "path",
@@ -254,7 +254,7 @@ export function useFileConnection({
       const file = await handle.getFile();
       const result = parseExplanation(await file.text());
       if (!result.ok) throw new Error(result.error);
-      const normalized = resolveGroupConflicts(normalize(result.data));
+      const normalized = tidyLayout(normalize(result.data));
       setPendingConnection({
         kind: "browser",
         preview: result.data,
@@ -306,7 +306,7 @@ export function useFileConnection({
         const data = await postFileApi<LocalFileRead>("read", { path: wanted });
         const result = parseExplanation(data.contents);
         if (!result.ok) throw new Error(result.error);
-        const next = resolveGroupConflicts(normalize(result.data));
+        const next = tidyLayout(normalize(result.data));
         lastFileJson.current = serializeDoc(next);
         setPathState(data.path);
         setBoundFile({
@@ -369,7 +369,7 @@ export function useFileConnection({
         const file = await handle.getFile();
         const result = parseExplanation(await file.text());
         if (!result.ok) throw new Error(result.error);
-        const next = resolveGroupConflicts(normalize(result.data));
+        const next = tidyLayout(normalize(result.data));
         lastFileJson.current = serializeDoc(next);
         setBoundFile(null);
         setBrowserFile({
@@ -575,7 +575,7 @@ export function useFileConnection({
       if (!res.ok) throw new Error("Could not load the example flow.");
       const result = parseExplanation(await res.text());
       if (!result.ok) throw new Error(result.error);
-      const next = resolveGroupConflicts(normalize(result.data));
+      const next = tidyLayout(normalize(result.data));
       lastFileJson.current = serializeDoc(next);
       setBoundFile(null);
       setBrowserFile(null);

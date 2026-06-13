@@ -382,6 +382,56 @@ export function tidyLayout(doc: Explanation): Explanation {
  */
 export function resolveGroupConflicts(work: Explanation): Explanation {
   const overlap = rectsOverlap;
+  const shiftRect = (r: CellRect, dCol: number, dRow: number): CellRect => ({
+    minC: r.minC + dCol,
+    maxC: r.maxC + dCol,
+    minR: r.minR + dRow,
+    maxR: r.maxR + dRow,
+  });
+  const rectInGrid = (r: CellRect) =>
+    r.minC >= GRID_LIMITS.minCol &&
+    r.maxC <= GRID_LIMITS.maxCol &&
+    r.minR >= GRID_LIMITS.minRow &&
+    r.maxR <= GRID_LIMITS.maxRow;
+  const boundsOf = (rects: CellRect[]) => ({
+    minC: Math.min(...rects.map((r) => r.minC)),
+    maxC: Math.max(...rects.map((r) => r.maxC)),
+    minR: Math.min(...rects.map((r) => r.minR)),
+    maxR: Math.max(...rects.map((r) => r.maxR)),
+  });
+  const compactPlacement = (r: CellRect, placed: CellRect[]) => {
+    if (!placed.some((p) => overlap(r, p))) return { rect: r, dCol: 0, dRow: 0 };
+    let best: { rect: CellRect; dCol: number; dRow: number; score: number } | null =
+      null;
+    const limit = 24;
+    for (const allowUp of [false, true]) {
+      for (let dRow = -limit; dRow <= limit; dRow++) {
+        if (!allowUp && dRow < 0) continue;
+        for (let dCol = -limit; dCol <= limit; dCol++) {
+          const shifted = shiftRect(r, dCol, dRow);
+          if (!rectInGrid(shifted) || placed.some((p) => overlap(shifted, p)))
+            continue;
+          const b = boundsOf([...placed, shifted]);
+          const width = b.maxC - b.minC + 1;
+          const height = b.maxR - b.minR + 1;
+          const move = Math.abs(dCol) + Math.abs(dRow);
+          const negativeSpace = Math.max(0, -b.minC) + Math.max(0, -b.minR);
+          const leftMove = Math.max(0, -dCol);
+          const score =
+            width * height * 100 +
+            width * 8 +
+            height * 3 +
+            move * 2 +
+            negativeSpace * 24 +
+            leftMove * 8;
+          if (!best || score < best.score)
+            best = { rect: shifted, dCol, dRow, score };
+        }
+      }
+      if (best) break;
+    }
+    return best ?? { rect: r, dCol: 0, dRow: 0 };
+  };
 
   for (let iter = 0; iter < 5; iter++) {
     const pos = layoutPositions(work);
@@ -400,28 +450,35 @@ export function resolveGroupConflicts(work: Explanation): Explanation {
       if (g.steps.length === 0) continue;
       let r = rects.get(g.id);
       if (!r) continue;
-      let dCol = 0;
-      let guard = 0;
-      while (guard++ < 12) {
-        const shifted = {
-          minC: r.minC + dCol,
-          maxC: r.maxC + dCol,
-          minR: r.minR,
-          maxR: r.maxR,
-        };
-        const hit = placed.find((p) => overlap(shifted, p));
-        if (!hit) break;
-        dCol = hit.maxC - r.minC + 1;
-      }
-      if (dCol > 0 && r.maxC + dCol <= GRID_LIMITS.maxCol) {
+      const next = compactPlacement(r, placed);
+      if (next.dCol || next.dRow) {
         separated = true;
         for (const sid of g.steps) {
           const p = pos.get(sid);
-          if (p) pins.set(sid, { col: p.col + dCol, row: p.row });
+          if (p)
+            pins.set(sid, {
+              col: p.col + next.dCol,
+              row: p.row + next.dRow,
+            });
         }
-        r = { ...r, minC: r.minC + dCol, maxC: r.maxC + dCol };
+        r = next.rect;
       }
       placed.push(r);
+    }
+
+    // If a pass separates groups, anchor every grouped member for the next
+    // pass. Otherwise unshifted groups can be re-laid out from edges that
+    // originate in the shifted group, making the first group grow and the
+    // separator chase it across the canvas.
+    if (separated) {
+      for (const g of groups) {
+        if (g.steps.length === 0) continue;
+        for (const sid of g.steps) {
+          if (pins.has(sid)) continue;
+          const p = pos.get(sid);
+          if (p) pins.set(sid, p);
+        }
+      }
     }
 
     // 3. evict non-members from any group footprint (after groups settle)
