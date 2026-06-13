@@ -56,6 +56,20 @@ overlap tiles. Browser screenshots from the preview webview are unreliable
 (hidden visibility throttles rAF/timers); prefer geometric assertions or
 `preview_eval`.
 
+## Security posture of the disk API
+
+`app/api/file/{read,stat,write}` resolve client-supplied **absolute** paths on
+purpose — Unfold is a local single-user tool and the point is to open a flow
+file anywhere on your machine. Guards in place: only `.json` paths are touched
+(`resolveLocalPath` in `_shared.ts`), reads/writes are capped at
+`MAX_FILE_BYTES` (8 MB), and `npm run dev` binds to `127.0.0.1` so the API is
+not network-reachable in development. This is intentionally NOT safe for a
+shared/hosted deployment: there is no auth and no root confinement. Before
+hosting for multiple users, either gate these routes behind auth + a
+root-directory check, or drop the disk API entirely and rely on the browser
+File System Access path (`useFileConnection` already supports `createWritable`
+handles, which never touch this API).
+
 ## Gotchas
 
 - Windows repo: never bulk-edit sources via PowerShell `Get-Content`/

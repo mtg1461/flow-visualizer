@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  // Don't advertise the framework/version in response headers.
+  poweredByHeader: false,
+};
 
 export default nextConfig;

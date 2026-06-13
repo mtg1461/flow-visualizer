@@ -1,6 +1,11 @@
 import path from "node:path";
 import { mkdir, stat, writeFile } from "node:fs/promises";
-import { errorResponse, jsonNoStore, resolveLocalPath } from "../_shared";
+import {
+  MAX_FILE_BYTES,
+  errorResponse,
+  jsonNoStore,
+  resolveLocalPath,
+} from "../_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +16,8 @@ export async function POST(request: Request) {
     const filePath = resolveLocalPath(body.path);
     if (typeof body.contents !== "string")
       return errorResponse("Missing file contents.", 400);
+    if (Buffer.byteLength(body.contents, "utf8") > MAX_FILE_BYTES)
+      return errorResponse("File is too large to save.", 413);
     JSON.parse(body.contents);
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(

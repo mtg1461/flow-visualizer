@@ -38,5 +38,3 @@ export const WRITE_PROJECT_PROMPT = `Create one JSON file that explains the syst
 Write the JSON file into this project. Prefer a suitable docs location such as docs/<short-topic>-flow.json unless this repository already has a better place for generated documentation or visualizer files. Create the folder if needed. After writing it, respond with the file path only.
 
 ${FLOW_SCHEMA_PROMPT}`;
-
-export const SCHEMA_PROMPT = RECEIVE_RESPONSE_PROMPT;

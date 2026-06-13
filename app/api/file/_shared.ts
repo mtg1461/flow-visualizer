@@ -1,13 +1,32 @@
 import path from "node:path";
 import { NextResponse } from "next/server";
 
+/** Upper bound on any flow file the disk API will read or write (8 MB).
+ *  A flow document is a few KB; this only exists to stop the endpoint from
+ *  being used to slurp or clobber arbitrarily large files. */
+export const MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Resolve a client-supplied path to an absolute one. The disk API is a
+ * convenience for a LOCAL, single-user tool — it intentionally allows
+ * absolute paths so a user can open a flow file anywhere on their machine.
+ * It is NOT safe to expose to a network: callers must keep the server bound
+ * to localhost (see the `dev` script) or gate these routes behind auth and a
+ * root-confinement check before hosting them for multiple users.
+ *
+ * As defense in depth the API only ever touches `.json` files, so even a
+ * reachable endpoint cannot overwrite executables, configs, or dotfiles.
+ */
 export function resolveLocalPath(input: unknown) {
   if (typeof input !== "string" || !input.trim())
     throw new Error("Enter a local JSON file path.");
   const trimmed = input.trim();
-  return path.normalize(
+  const resolved = path.normalize(
     path.isAbsolute(trimmed) ? trimmed : path.resolve(process.cwd(), trimmed)
   );
+  if (path.extname(resolved).toLowerCase() !== ".json")
+    throw new Error("Only .json files can be opened or saved.");
+  return resolved;
 }
 
 export function jsonNoStore(body: unknown, status = 200) {

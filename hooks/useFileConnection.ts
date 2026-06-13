@@ -584,11 +584,6 @@ export function useFileConnection({
     setStatus("idle");
   }, []);
 
-  const reportError = useCallback((message: string) => {
-    setError(message);
-    setStatus("error");
-  }, []);
-
   const disconnect = useCallback(() => {
     if (saveTimer.current) {
       window.clearTimeout(saveTimer.current);
@@ -615,6 +610,5 @@ export function useFileConnection({
     connectDropped,
     connectPending,
     disconnect,
-    reportError,
   };
 }
