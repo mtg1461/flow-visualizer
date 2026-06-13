@@ -764,12 +764,10 @@ export function Editor({ initial }: Props) {
     return (
       <>
         <ConnectionScreen
-          path={fileConnection.path}
           status={fileConnection.status}
           error={fileConnection.error}
           preview={fileConnection.preview}
           allowLocalPath={LOCAL_FILES_ENABLED}
-          onPathChange={fileConnection.setPath}
           onConnectPreview={fileConnection.connectPending}
           onClearPreview={fileConnection.clearPreview}
           onBrowse={fileConnection.browseFile}

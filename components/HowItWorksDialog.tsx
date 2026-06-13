@@ -32,31 +32,31 @@ const STEPS: { icon: LucideIcon; tone: Tone; title: string; body: string }[] = [
     icon: ClipboardCopy,
     tone: "accent",
     title: "Copy the agent prompt",
-    body: "A short JSON contract that tells an agent exactly what to produce.",
+    body: "The JSON contract for your agent.",
   },
   {
     icon: Bot,
     tone: "teal",
-    title: "Hand it to your coding agent",
-    body: "Paste it into an agent working in your repo so it has the project's full context.",
+    title: "Hand it to your agent",
+    body: "Paste it into a coding agent in your repo.",
   },
   {
     icon: FileJson,
     tone: "amber",
     title: "It writes a flow file",
-    body: "The agent saves a small JSON file — like docs/payments-flow.json — describing how the system works.",
+    body: "A small JSON describing the system.",
   },
   {
     icon: Plug,
     tone: "rose",
-    title: "Connect the file here",
-    body: "Browse to it or drag it onto this screen to open it on the canvas.",
+    title: "Connect it here",
+    body: "Browse or drag the file in.",
   },
   {
     icon: SquarePen,
     tone: "accent",
-    title: "Edit visually — it saves back",
-    body: "Drag tiles, edit steps, and restyle edges. Changes write straight back to your file.",
+    title: "Edit visually",
+    body: "Changes save back to the file.",
   },
 ];
 
@@ -85,9 +85,6 @@ export function HowItWorksDialog({ open, onClose, onOpenAgentPrompt }: Props) {
             </div>
             <div>
               <h2 className="text-[15px] font-medium">How it works</h2>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
-                From a plain-language ask to an editable diagram, in five steps.
-              </p>
             </div>
           </div>
           <button

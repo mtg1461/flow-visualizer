@@ -29,13 +29,11 @@ export interface ConnectionPreview {
 }
 
 interface Props {
-  path: string;
   status: FileSyncStatus;
   error: string | null;
   preview: ConnectionPreview | null;
-  /** Whether the local-disk path field applies (off on a hosted build). */
+  /** Whether disk paths apply (off on a hosted build) — tunes the drop copy. */
   allowLocalPath: boolean;
-  onPathChange: (path: string) => void;
   onConnectPreview: () => void;
   onClearPreview: () => void;
   onBrowse: () => void;
@@ -45,15 +43,11 @@ interface Props {
   onAgentPrompt: () => void;
 }
 
-const EXAMPLE_PATH = "examples\\live-flow.json";
-
 export function ConnectionScreen({
-  path,
   status,
   error,
   preview,
   allowLocalPath,
-  onPathChange,
   onConnectPreview,
   onClearPreview,
   onBrowse,
@@ -160,41 +154,26 @@ export function ConnectionScreen({
 
         <div className="mt-6">
           <label className="block text-[11px] font-medium uppercase tracking-[0.08em] text-faint">
-            {allowLocalPath ? "Local path" : "Open a file"}
+            Open a file
           </label>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            {allowLocalPath && (
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-well px-3 py-2 focus-within:border-accent/60">
-                <FileJson size={14} className="shrink-0 text-accent" />
-                <input
-                  aria-label="Local path"
-                  value={path}
-                  onChange={(e) => onPathChange(e.target.value)}
-                  spellCheck={false}
-                  placeholder={EXAMPLE_PATH}
-                  className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-text placeholder:text-faint focus:outline-none"
-                />
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onBrowse}
-                disabled={busy}
-                className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <FolderOpen size={13} />
-                Browse
-              </button>
-              <button
-                type="button"
-                onClick={onHowItWorks}
-                className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
-              >
-                <Workflow size={13} />
-                How it works
-              </button>
-            </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={onBrowse}
+              disabled={busy}
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FolderOpen size={13} />
+              Browse
+            </button>
+            <button
+              type="button"
+              onClick={onHowItWorks}
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
+            >
+              <Workflow size={13} />
+              How it works
+            </button>
           </div>
         </div>
 
