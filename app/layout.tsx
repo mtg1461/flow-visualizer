@@ -17,7 +17,7 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Flow Visualizer — see how it works",
+  title: "Flow Visualizer",
   description:
     "Paste an AI agent's structured explanation and see how something works as one elegant visual flow.",
 };
