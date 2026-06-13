@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Sparkles,
   Upload,
+  Workflow,
 } from "lucide-react";
 import { FlowMark } from "./FlowMark";
 
@@ -40,6 +41,7 @@ interface Props {
   onBrowse: () => void;
   onDropConnection: (dataTransfer: DataTransfer) => void;
   onSeeExample: () => void;
+  onHowItWorks: () => void;
   onAgentPrompt: () => void;
 }
 
@@ -57,6 +59,7 @@ export function ConnectionScreen({
   onBrowse,
   onDropConnection,
   onSeeExample,
+  onHowItWorks,
   onAgentPrompt,
 }: Props) {
   const [over, setOver] = useState(false);
@@ -182,6 +185,14 @@ export function ConnectionScreen({
               >
                 <FolderOpen size={13} />
                 Browse
+              </button>
+              <button
+                type="button"
+                onClick={onHowItWorks}
+                className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
+              >
+                <Workflow size={13} />
+                How it works
               </button>
             </div>
           </div>

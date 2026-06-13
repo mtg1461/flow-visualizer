@@ -23,6 +23,7 @@ import { Toolbar } from "./Toolbar";
 import { ConnectionScreen } from "./ConnectionScreen";
 import { DisconnectDialog } from "./DisconnectDialog";
 import { AgentPromptDialog } from "./AgentPromptDialog";
+import { HowItWorksDialog } from "./HowItWorksDialog";
 import { useEditorHistory } from "@/hooks/useEditorHistory";
 import { useFileConnection } from "@/hooks/useFileConnection";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
@@ -92,6 +93,7 @@ export function Editor({ initial }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [agentPromptOpen, setAgentPromptOpen] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [fitSignal, setFitSignal] = useState(0);
@@ -773,7 +775,16 @@ export function Editor({ initial }: Props) {
           onBrowse={fileConnection.browseFile}
           onDropConnection={fileConnection.connectDropped}
           onSeeExample={fileConnection.loadExample}
+          onHowItWorks={() => setHowItWorksOpen(true)}
           onAgentPrompt={() => setAgentPromptOpen(true)}
+        />
+        <HowItWorksDialog
+          open={howItWorksOpen}
+          onClose={() => setHowItWorksOpen(false)}
+          onOpenAgentPrompt={() => {
+            setHowItWorksOpen(false);
+            setAgentPromptOpen(true);
+          }}
         />
         <AgentPromptDialog
           open={agentPromptOpen}
