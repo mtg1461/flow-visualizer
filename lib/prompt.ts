@@ -28,7 +28,8 @@ How to model it well:
 - Use "loops" (or a backward "then"/branch) only for genuine feedback — a later outcome that revises earlier state. One or two is normal; do not wire a loop from every step.
 - "input" is the trigger, "output" the result, "wait" pauses for an external event; everything else is "process". Give each step the actor that performs it.
 - Cluster related steps into "groups" by phase or subsystem when two or more belong together.
-- Keep it tight and honest: roughly 6-14 steps, stable lowercase unique ids, every referenced id present, no orphan steps. Omit layout and styling fields (grid, color, line) — the tool adds those.`;
+- Keep it tight and honest: roughly 6-14 steps, stable lowercase unique ids, every referenced id present, no orphan steps.
+- Omit layout and styling fields: step/group "grid", step/group color overrides, and edge color/line overrides. The app and user handle placement and coloring.`;
 
 export const RECEIVE_RESPONSE_PROMPT = `Explain how the system works as one visual flow. Return only valid JSON — no markdown fences, no prose.
 
