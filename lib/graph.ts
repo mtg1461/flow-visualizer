@@ -586,10 +586,13 @@ function toward(from: Pt, to: Pt, by: number): Pt {
 }
 
 /**
- * Orthogonal routing with rounded corners. Forward edges leave the bottom
- * and travel through row gutters; backward (feedback) edges run up vertical
- * channels right of the tiles; system loops run up channels on the left.
- * Edges render under tiles, so rare crossings pass behind them.
+ * Orthogonal routing with rounded corners, by geometry alone. Descending
+ * edges leave the bottom and travel through row gutters; climbing edges
+ * (loops included) take a vertical channel on whichever side of the pair
+ * is cheaper — least horizontal travel, fewest blocked jogs — and enter
+ * through the target's near side, never its top. Edges render under
+ * tiles, so rare crossings pass behind them. A final pass slides labels
+ * along their own segment into free space.
  */
 export function routeEdges(
   doc: Explanation,
@@ -629,9 +632,10 @@ export function routeEdges(
 
   const edges = buildEdges(doc).filter((e) => pos.has(e.from) && pos.has(e.to));
 
+  // bottom fan: only descending edges actually leave through the bottom
   const outOrder = new Map<string, EdgeDesc[]>();
   for (const e of edges) {
-    if (e.kind === "loop") continue;
+    if (P(e.to).row <= P(e.from).row) continue;
     const arr = outOrder.get(e.from) ?? [];
     arr.push(e);
     outOrder.set(e.from, arr);
@@ -639,20 +643,62 @@ export function routeEdges(
 
   const span = (e: EdgeDesc) =>
     Math.abs(P(e.from).row - P(e.to).row) + Math.abs(P(e.from).col - P(e.to).col);
-  // edges that climb a right-side channel: any non-loop edge whose target
-  // sits on a higher row, regardless of narrative direction
-  const rightChan = new Map<string, number>();
-  edges
-    .filter((e) => e.kind !== "loop" && P(e.to).row < P(e.from).row)
-    .sort((a, b) => span(a) - span(b))
-    .forEach((e, i) => rightChan.set(e.key, i));
-  const leftChan = new Map<string, number>();
-  edges
-    .filter((e) => e.kind === "loop")
-    .sort((a, b) => span(a) - span(b))
-    .forEach((e, i) => leftChan.set(e.key, i));
-  const sideCount = new Map<number, number>();
+
+  // Climbing edges (loops included — they are ordinary connections) pick
+  // the cheaper side: horizontal detour plus a penalty for every gutter
+  // jog that blocking tiles would force. Channels index per side so the
+  // shortest edge hugs the tiles.
+  const climbing = edges.filter((e) => P(e.to).row < P(e.from).row);
+  const sideOf = new Map<string, "L" | "R">();
+  for (const e of climbing) {
+    const A = P(e.from);
+    const B = P(e.to);
+    const xr = Math.max(A.x, B.x) + NODE_W + 24;
+    const xl = Math.min(A.x, B.x) - 24;
+    const costR =
+      xr -
+      (A.x + NODE_W) +
+      (xr - (B.x + NODE_W)) +
+      (hBlocked(A.row, A.x + NODE_W, xr, e.from) ? 250 : 0) +
+      (hBlocked(B.row, xr, B.x + NODE_W, e.to) ? 250 : 0);
+    const costL =
+      A.x -
+      xl +
+      (B.x - xl) +
+      (hBlocked(A.row, xl, A.x, e.from) ? 250 : 0) +
+      (hBlocked(B.row, xl, B.x, e.to) ? 250 : 0);
+    sideOf.set(e.key, costL < costR ? "L" : "R");
+  }
+  // Lanes pool per gap column (the inter-column gap fits three 14px lanes;
+  // overflow wraps to the next gap over, which is tile-free by construction)
+  const chanIdx = new Map<string, number>();
+  {
+    const pools = new Map<string, EdgeDesc[]>();
+    for (const e of climbing) {
+      const side = sideOf.get(e.key)!;
+      const A = P(e.from);
+      const B = P(e.to);
+      const gapCol =
+        side === "R" ? Math.max(A.col, B.col) : Math.min(A.col, B.col);
+      const k = `${side}|${gapCol}`;
+      const arr = pools.get(k) ?? [];
+      arr.push(e);
+      pools.set(k, arr);
+    }
+    for (const arr of pools.values())
+      arr
+        .sort((a, b) => span(a) - span(b))
+        .forEach((e, i) => chanIdx.set(e.key, i));
+  }
+  const laneOff = (lane: number) =>
+    24 + (lane % 3) * 14 + Math.floor(lane / 3) * CELL_W;
+
+  const sideCount = new Map<string, number>();
   const gutterCount = new Map<number, number>();
+
+  /** The segment each label sits on, so placement can slide along it. */
+  type Seg = { horiz: boolean; lo: number; hi: number };
+  const segs = new Map<string, Seg>();
 
   const routed: RoutedEdge[] = [];
   for (const e of edges) {
@@ -667,79 +713,12 @@ export function routeEdges(
     let pts: Pt[];
     let lx: number;
     let ly: number;
+    let seg: Seg | null = null;
 
-    if (e.kind === "loop" && A.row === B.row) {
-      // a loop along one row hops the gutter above instead of degenerating
-      // into a straight line through every tile on the row
-      const gy = A.row * CELL_H + 10;
-      pts = [
-        { x: A.x + NODE_W / 2, y: A.y },
-        { x: A.x + NODE_W / 2, y: gy },
-        { x: B.x + NODE_W / 2, y: gy },
-        { x: B.x + NODE_W / 2, y: B.y },
-      ];
-      lx = (A.x + B.x + NODE_W) / 2;
-      ly = gy;
-    } else if (e.kind === "loop") {
-      const chan = leftChan.get(e.key) ?? 0;
-      const chanX = Math.min(A.x, B.x) - 24 - chan * 14;
-      const ay = A.y + NODE_H / 2;
-      const by = B.y + NODE_H / 2;
-      pts = [{ x: A.x, y: ay }];
-      let chanStartY = ay;
-      if (hBlocked(A.row, chanX, A.x, e.from)) {
-        // tiles sit between the source and the channel — jog via gutter
-        const gyA =
-          B.row < A.row ? A.row * CELL_H + 12 : (A.row + 1) * CELL_H - 12;
-        pts.push({ x: A.x - 14, y: ay }, { x: A.x - 14, y: gyA });
-        chanStartY = gyA;
-      }
-      pts.push({ x: chanX, y: chanStartY });
-      let chanEndY = by;
-      const entry: { x: number; y: number }[] = [];
-      if (hBlocked(B.row, chanX, B.x, e.to)) {
-        const gyB =
-          A.row < B.row ? B.row * CELL_H + 12 : (B.row + 1) * CELL_H - 12;
-        chanEndY = gyB;
-        entry.push({ x: B.x - 14, y: gyB }, { x: B.x - 14, y: by });
-      }
-      pts.push({ x: chanX, y: chanEndY }, ...entry, { x: B.x, y: by });
-      lx = chanX;
-      ly = (chanStartY + chanEndY) / 2;
-    } else if (B.row < A.row) {
-      // target sits above the source — climb a right-side channel and
-      // enter through the target's side, never its top
-      const chan = rightChan.get(e.key) ?? 0;
-      const chanX = Math.max(A.x, B.x) + NODE_W + 24 + chan * 14;
-      const ay = A.y + NODE_H / 2;
-      const by = B.y + NODE_H / 2;
-      pts = [{ x: A.x + NODE_W, y: ay }];
-      let chanStartY = ay;
-      if (hBlocked(A.row, A.x + NODE_W, chanX, e.from)) {
-        const gyA = A.row * CELL_H + 12; // toward the target, which is above
-        pts.push(
-          { x: A.x + NODE_W + 14, y: ay },
-          { x: A.x + NODE_W + 14, y: gyA }
-        );
-        chanStartY = gyA;
-      }
-      pts.push({ x: chanX, y: chanStartY });
-      let chanEndY = by;
-      const entry: { x: number; y: number }[] = [];
-      if (hBlocked(B.row, chanX, B.x + NODE_W, e.to)) {
-        const gyB = (B.row + 1) * CELL_H - 12; // approaching from below
-        chanEndY = gyB;
-        entry.push(
-          { x: B.x + NODE_W + 14, y: gyB },
-          { x: B.x + NODE_W + 14, y: by }
-        );
-      }
-      pts.push({ x: chanX, y: chanEndY }, ...entry, { x: B.x + NODE_W, y: by });
-      lx = chanX;
-      ly = (chanStartY + chanEndY) / 2;
-    } else if (B.row === A.row) {
-      if (e.backward) {
-        // same-row retry hops over the top gutter
+    if (B.row === A.row) {
+      if (e.kind === "loop" || e.backward) {
+        // a same-row return hops the gutter above instead of degenerating
+        // into a straight line through every tile on the row
         const gy = A.row * CELL_H + 10;
         pts = [
           { x: A.x + NODE_W / 2, y: A.y },
@@ -749,6 +728,11 @@ export function routeEdges(
         ];
         lx = (A.x + B.x + NODE_W) / 2;
         ly = gy;
+        seg = {
+          horiz: true,
+          lo: Math.min(A.x, B.x) + NODE_W / 2,
+          hi: Math.max(A.x, B.x) + NODE_W / 2,
+        };
       } else {
         const ay = A.y + NODE_H / 2;
         const ltr = B.col > A.col;
@@ -761,6 +745,7 @@ export function routeEdges(
           ];
           lx = (A.x + B.x + NODE_W) / 2;
           ly = ay - 14;
+          seg = { horiz: true, lo: Math.min(sx, ex), hi: Math.max(sx, ex) };
         } else {
           // tiles in between — duck through the gutter below the row
           const gy = (A.row + 1) * CELL_H;
@@ -775,9 +760,58 @@ export function routeEdges(
           ];
           lx = (A.x + B.x + NODE_W) / 2;
           ly = gy;
+          seg = {
+            horiz: true,
+            lo: Math.min(sx + off, ex - off),
+            hi: Math.max(sx + off, ex - off),
+          };
         }
       }
+    } else if (B.row < A.row) {
+      // target sits above the source — climb the chosen side's channel
+      // and enter through the target's near side, never its top
+      const side = sideOf.get(e.key) ?? "R";
+      const off = laneOff(chanIdx.get(e.key) ?? 0);
+      const chanX =
+        side === "R"
+          ? Math.max(A.x, B.x) + NODE_W + off
+          : Math.min(A.x, B.x) - off;
+      const exitX = side === "R" ? A.x + NODE_W : A.x;
+      const enterX = side === "R" ? B.x + NODE_W : B.x;
+      const jog = side === "R" ? 14 : -14;
+      const ay = A.y + NODE_H / 2;
+      const by = B.y + NODE_H / 2;
+      pts = [{ x: exitX, y: ay }];
+      let chanStartY = ay;
+      if (
+        hBlocked(A.row, Math.min(exitX, chanX), Math.max(exitX, chanX), e.from)
+      ) {
+        // tiles sit between the source and the channel — jog via gutter
+        const gyA = A.row * CELL_H + 12; // toward the target, which is above
+        pts.push({ x: exitX + jog, y: ay }, { x: exitX + jog, y: gyA });
+        chanStartY = gyA;
+      }
+      pts.push({ x: chanX, y: chanStartY });
+      let chanEndY = by;
+      const entry: Pt[] = [];
+      if (
+        hBlocked(B.row, Math.min(chanX, enterX), Math.max(chanX, enterX), e.to)
+      ) {
+        const gyB = (B.row + 1) * CELL_H - 12; // approaching from below
+        chanEndY = gyB;
+        entry.push({ x: enterX + jog, y: gyB }, { x: enterX + jog, y: by });
+      }
+      pts.push({ x: chanX, y: chanEndY }, ...entry, { x: enterX, y: by });
+      lx = chanX;
+      ly = (chanStartY + chanEndY) / 2;
+      seg = {
+        horiz: false,
+        lo: Math.min(chanStartY, chanEndY),
+        hi: Math.max(chanStartY, chanEndY),
+      };
     } else {
+      // descending — straight drop, gutter run into the top, or a side
+      // entry beside the target, whichever clears first
       const gIdx = gutterCount.get(A.row) ?? 0;
       gutterCount.set(A.row, gIdx + 1);
       const gy = (A.row + 1) * CELL_H + (gIdx % 4) * 12 - 18;
@@ -790,6 +824,7 @@ export function routeEdges(
         pts = [{ x: outX, y: A.y + NODE_H }, bTop];
         lx = outX;
         ly = (A.y + NODE_H + B.y) / 2;
+        seg = { horiz: false, lo: A.y + NODE_H, hi: B.y };
       } else if (colClear(B.col, A.row + 1, B.row - 1)) {
         pts = [
           { x: outX, y: A.y + NODE_H },
@@ -799,40 +834,104 @@ export function routeEdges(
         ];
         lx = (outX + bTop.x) / 2;
         ly = gy;
+        seg = {
+          horiz: true,
+          lo: Math.min(outX, bTop.x),
+          hi: Math.max(outX, bTop.x),
+        };
       } else {
-        const sc = sideCount.get(B.col) ?? 0;
-        sideCount.set(B.col, sc + 1);
-        const chanX = B.x + NODE_W + 18 + sc * 12;
+        // the target's column is blocked — drop beside it and enter
+        // through whichever side faces the approach
+        const left = outX <= B.x + NODE_W / 2;
+        const sk = `${B.col}|${left ? "L" : "R"}`;
+        // four 12px lanes fit the gap; beyond that lanes repeat rather
+        // than drift into the neighbouring column's tiles
+        const sc = (sideCount.get(sk) ?? 0) % 4;
+        sideCount.set(sk, sc + 1);
+        const chanX = left ? B.x - 18 - sc * 12 : B.x + NODE_W + 18 + sc * 12;
+        const enterX = left ? B.x : B.x + NODE_W;
         const by = B.y + NODE_H / 2;
         pts = [
           { x: outX, y: A.y + NODE_H },
           { x: outX, y: gy },
           { x: chanX, y: gy },
           { x: chanX, y: by },
-          { x: B.x + NODE_W, y: by },
+          { x: enterX, y: by },
         ];
         lx = chanX;
         ly = (gy + by) / 2;
+        seg = { horiz: false, lo: Math.min(gy, by), hi: Math.max(gy, by) };
       }
     }
     routed.push({ ...e, d: orthoPath(pts), labelX: lx, labelY: ly });
+    if (seg && e.label) segs.set(e.key, seg);
   }
 
-  // nudge overlapping labels apart (top-down, so pushes accumulate)
+  // Label placement: every label prefers its natural spot but may slide
+  // along its own segment — and tuck beside a vertical channel — scored
+  // by how much tile and label area it would cover.
   const estW = (s: string) => Math.min(170, s.length * 5.8 + 18);
+  const LBL_H = 22;
+  const labelRect = (cx: number, cy: number, w: number) => ({
+    l: cx - w / 2,
+    t: cy - LBL_H / 2,
+    r: cx + w / 2,
+    b: cy + LBL_H / 2,
+  });
+  type Rect = ReturnType<typeof labelRect>;
+  const overlapArea = (a: Rect, b: Rect) =>
+    Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) *
+    Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+  const tileRects: Rect[] = [...pos.values()].map((p) => ({
+    l: p.col * CELL_W + GX,
+    t: p.row * CELL_H + GY,
+    r: p.col * CELL_W + GX + NODE_W,
+    b: p.row * CELL_H + GY + NODE_H,
+  }));
+
+  const placedRects: Rect[] = [];
   const labeled = routed.filter((e) => e.label);
   labeled.sort((a, b) => a.labelY - b.labelY || a.labelX - b.labelX);
-  for (let i = 1; i < labeled.length; i++) {
-    for (let j = 0; j < i; j++) {
-      const a = labeled[j];
-      const b = labeled[i];
-      if (
-        Math.abs(a.labelX - b.labelX) * 2 < estW(a.label!) + estW(b.label!) &&
-        Math.abs(a.labelY - b.labelY) < 22
-      ) {
-        b.labelY = a.labelY + 22;
+  for (const e of labeled) {
+    const w = estW(e.label!);
+    const seg = segs.get(e.key);
+    const cands = [{ x: e.labelX, y: e.labelY, pen: 0 }];
+    const slides = [-96, -72, -48, -24, 24, 48, 72, 96];
+    if (seg?.horiz) {
+      for (const s of slides) {
+        const x = e.labelX + s;
+        if (x >= seg.lo - 8 && x <= seg.hi + 8)
+          cands.push({ x, y: e.labelY, pen: Math.abs(s) * 0.15 });
+      }
+    } else if (seg) {
+      for (const dx of [0, -(w / 2 + 9), w / 2 + 9]) {
+        for (const s of [0, ...slides]) {
+          if (dx === 0 && s === 0) continue;
+          const y = e.labelY + s;
+          if (y >= seg.lo + 4 && y <= seg.hi - 4)
+            cands.push({
+              x: e.labelX + dx,
+              y,
+              pen: Math.abs(s) * 0.15 + (dx ? 26 : 0),
+            });
+        }
       }
     }
+    let best = cands[0];
+    let bestScore = Infinity;
+    for (const c of cands) {
+      const r = labelRect(c.x, c.y, w);
+      let score = c.pen;
+      for (const t of tileRects) score += overlapArea(r, t) / 40;
+      for (const p of placedRects) score += overlapArea(r, p) / 22;
+      if (score < bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+    e.labelX = best.x;
+    e.labelY = best.y;
+    placedRects.push(labelRect(best.x, best.y, w));
   }
 
   return routed;
