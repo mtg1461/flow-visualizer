@@ -228,9 +228,9 @@ export function Toolbar({
         type="button"
         title="Re-run the automatic layout"
         onClick={onTidy}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-3 text-[12.5px] text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-amber/55 bg-amber/15 px-3 text-[12.5px] font-medium text-amber shadow-[0_0_18px_rgba(238,194,122,0.14)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-amber/80 hover:bg-amber/25 hover:shadow-[0_0_24px_rgba(238,194,122,0.22)] active:translate-y-0"
       >
-        <Wand2 size={13} />
+        <Wand2 size={13} strokeWidth={2.4} />
         Tidy
       </button>
       <button
