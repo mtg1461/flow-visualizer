@@ -148,7 +148,7 @@ export interface RoutedEdge extends EdgeDesc {
  * The editor needs every connection explicit, so implicit nexts are
  * materialized into `then` on load and stripped again on export.
  */
-export function normalize(doc: Explanation): Explanation {
+export function normalize<T extends Explanation>(doc: T): T {
   const steps = doc.steps.map((s, i) => {
     const next = doc.steps[i + 1];
     if (!s.branches?.length && !s.then && next) return { ...s, then: next.id };
@@ -157,7 +157,7 @@ export function normalize(doc: Explanation): Explanation {
   return { ...doc, steps };
 }
 
-export function denormalize(doc: Explanation): Explanation {
+export function denormalize<T extends Explanation>(doc: T): T {
   const steps = doc.steps.map((s, i) => {
     const next = doc.steps[i + 1];
     if (
@@ -313,11 +313,11 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
  * 5. Group members end pinned (rule 2: groups anchor their members).
  * Each pass re-runs the real layout, so the result is exactly what renders.
  */
-export function tidyLayout(doc: Explanation): Explanation {
+export function tidyLayout<T extends Explanation>(doc: T): T {
   const originalMembers = new Map(
     (doc.groups ?? []).map((g) => [g.id, [...g.steps]])
   );
-  let work: Explanation = {
+  let work: T = {
     ...doc,
     steps: doc.steps.map((s) => {
       if (!s.grid) return s;
@@ -380,7 +380,7 @@ export function tidyLayout(doc: Explanation): Explanation {
  * overlapping groups, evicts non-members from group footprints, and parks
  * colliding empty regions. Leaves existing pins alone.
  */
-export function resolveGroupConflicts(work: Explanation): Explanation {
+export function resolveGroupConflicts<T extends Explanation>(work: T): T {
   const overlap = rectsOverlap;
   const shiftRect = (r: CellRect, dCol: number, dRow: number): CellRect => ({
     minC: r.minC + dCol,

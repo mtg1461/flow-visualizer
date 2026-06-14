@@ -1,21 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Explanation } from "@/lib/types";
+import type { FlowFile } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
-import { parseExplanation } from "@/lib/parse";
+import { parseFlowFile } from "@/lib/parse";
 import { Editor } from "@/components/Editor";
 import { STORAGE_KEY } from "@/hooks/useEditorHistory";
 
 export default function Home() {
-  const [initial, setInitial] = useState<Explanation | null>(null);
+  const [initial, setInitial] = useState<FlowFile | null>(null);
 
   useEffect(() => {
     let doc = SAMPLE;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const result = parseExplanation(stored);
+        const result = parseFlowFile(stored);
         if (result.ok) doc = result.data;
       }
     } catch {

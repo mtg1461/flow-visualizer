@@ -3,9 +3,7 @@
 import { useState, type DragEvent } from "react";
 import {
   CircleAlert,
-  ArrowLeft,
   Bot,
-  FileJson,
   FilePlus2,
   FolderOpen,
   Sparkles,
@@ -13,6 +11,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { FlowMark } from "./FlowMark";
+import { ViewSelectionScreen } from "./ViewSelectionScreen";
 
 export type FileSyncStatus =
   | "idle"
@@ -27,6 +26,12 @@ export type FileSyncStatus =
 export interface ConnectionPreview {
   sourceName: string;
   canRequestWrite: boolean;
+  views: {
+    id: string;
+    title: string;
+    summary?: string;
+    stepCount: number;
+  }[];
 }
 
 interface Props {
@@ -35,7 +40,7 @@ interface Props {
   preview: ConnectionPreview | null;
   /** Whether disk paths apply (off on a hosted build) — tunes the drop copy. */
   allowLocalPath: boolean;
-  onConnectPreview: () => void;
+  onConnectPreview: (viewId: string) => void;
   onClearPreview: () => void;
   onBrowse: () => void;
   onCreateEmpty: () => void;
@@ -70,65 +75,14 @@ export function ConnectionScreen({
 
   if (preview) {
     return (
-      <main className="flex h-dvh items-center justify-center bg-bg p-5">
-        <section className="anim-pop w-full max-w-[720px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={onClearPreview}
-              className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-colors hover:border-line-strong hover:text-text"
-            >
-              <ArrowLeft size={13} />
-              Choose another
-            </button>
-            <button
-              type="button"
-              onClick={onAgentPrompt}
-              className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
-            >
-              <Bot size={13} />
-              Agent Prompt
-            </button>
-          </div>
-
-          <div className="mt-5 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
-              <FileJson size={18} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-[18px] font-semibold">Ready to connect</h1>
-              <p className="truncate font-mono text-[11.5px] text-faint">
-                {preview.sourceName}
-              </p>
-            </div>
-          </div>
-
-          {preview.canRequestWrite && (
-            <p className="mt-4 text-[12.5px] leading-relaxed text-mute">
-              Your browser will ask for permission to save changes to this file
-              when you connect.
-            </p>
-          )}
-
-          {error && (
-            <p className="mt-4 flex items-start gap-2 text-[12.5px] leading-snug text-rose">
-              <CircleAlert size={13} className="mt-0.5 shrink-0" />
-              {error}
-            </p>
-          )}
-
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={onConnectPreview}
-              disabled={busy}
-              className="h-9 cursor-pointer rounded-lg bg-accent px-5 text-[12.5px] font-medium text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Connect
-            </button>
-          </div>
-        </section>
-      </main>
+      <ViewSelectionScreen
+        status={status}
+        error={error}
+        preview={preview}
+        onSelect={onConnectPreview}
+        onClear={onClearPreview}
+        onAgentPrompt={onAgentPrompt}
+      />
     );
   }
 

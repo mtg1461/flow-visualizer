@@ -1,4 +1,10 @@
-import type { EdgeLine, Explanation, Step, StepKind } from "./types";
+import type {
+  EdgeLine,
+  FlowFile,
+  FlowView,
+  Step,
+  StepKind,
+} from "./types";
 
 const KINDS: StepKind[] = ["input", "process", "decision", "output", "wait"];
 const LINES: EdgeLine[] = ["solid", "dashed", "dotted"];
@@ -8,17 +14,18 @@ function asLine(v: unknown): EdgeLine | undefined {
 }
 
 export type ParseResult =
-  | { ok: true; data: Explanation }
+  | { ok: true; data: FlowFile }
   | { ok: false; error: string };
 
 /** Accepts raw agent output: tolerates markdown fences and leading prose. */
-export function parseExplanation(raw: string): ParseResult {
+export function parseFlowFile(raw: string): ParseResult {
   let text = raw.trim();
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fence) text = fence[1].trim();
   if (!text.startsWith("{")) {
     const start = text.indexOf("{");
-    if (start === -1) return { ok: false, error: "No JSON object found in the pasted text." };
+    if (start === -1)
+      return { ok: false, error: "No JSON object found in the pasted text." };
     text = text.slice(start);
   }
 
@@ -33,23 +40,74 @@ export function parseExplanation(raw: string): ParseResult {
     return { ok: false, error: "Expected a JSON object at the top level." };
 
   const obj = json as Record<string, unknown>;
+  if (!Array.isArray(obj.views))
+    return {
+      ok: false,
+      error: `Missing "views" — flow files must contain a non-empty array of flow views.`,
+    };
+  if (obj.views.length === 0)
+    return { ok: false, error: `"views" must contain at least one flow view.` };
+
+  const ids = new Set<string>();
+  const views: FlowView[] = [];
+  for (let i = 0; i < obj.views.length; i++) {
+    const parsed = parseView(obj.views[i], i);
+    if (!parsed.ok) return parsed;
+    if (ids.has(parsed.data.id))
+      return { ok: false, error: `Duplicate view id "${parsed.data.id}".` };
+    ids.add(parsed.data.id);
+    views.push(parsed.data);
+  }
+
+  return { ok: true, data: { views } };
+}
+
+function parseView(raw: unknown, viewIndex: number): ParseResultForView {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    return { ok: false, error: `View ${viewIndex + 1} is not an object.` };
+
+  const obj = raw as Record<string, unknown>;
   if (typeof obj.title !== "string" || !obj.title.trim())
-    return { ok: false, error: `Missing "title" — a short name for what is being explained.` };
+    return {
+      ok: false,
+      error: `View ${viewIndex + 1} is missing "title" — a short name for what is being explained.`,
+    };
   if (!Array.isArray(obj.steps) || obj.steps.length === 0)
-    return { ok: false, error: `Missing "steps" — the ordered sequence is the spine of the flow.` };
+    return {
+      ok: false,
+      error: `View "${obj.title.trim()}" is missing "steps" — the ordered sequence is the spine of the flow.`,
+    };
+
+  const viewId =
+    typeof obj.id === "string" && obj.id.trim()
+      ? obj.id.trim()
+      : `view-${viewIndex + 1}`;
 
   const steps: Step[] = [];
-  const ids = new Set<string>();
+  const stepIds = new Set<string>();
   for (let i = 0; i < obj.steps.length; i++) {
     const s = obj.steps[i] as Record<string, unknown>;
     if (typeof s !== "object" || s === null)
-      return { ok: false, error: `Step ${i + 1} is not an object.` };
-    const id = typeof s.id === "string" && s.id.trim() ? s.id.trim() : `step-${i + 1}`;
-    if (ids.has(id)) return { ok: false, error: `Duplicate step id "${id}".` };
-    ids.add(id);
+      return {
+        ok: false,
+        error: `View "${obj.title.trim()}" step ${i + 1} is not an object.`,
+      };
+    const id =
+      typeof s.id === "string" && s.id.trim() ? s.id.trim() : `step-${i + 1}`;
+    if (stepIds.has(id))
+      return {
+        ok: false,
+        error: `View "${obj.title.trim()}" has duplicate step id "${id}".`,
+      };
+    stepIds.add(id);
     if (typeof s.title !== "string" || !s.title.trim())
-      return { ok: false, error: `Step ${i + 1} is missing a "title".` };
-    const kind = KINDS.includes(s.kind as StepKind) ? (s.kind as StepKind) : "process";
+      return {
+        ok: false,
+        error: `View "${obj.title.trim()}" step ${i + 1} is missing a "title".`,
+      };
+    const kind = KINDS.includes(s.kind as StepKind)
+      ? (s.kind as StepKind)
+      : "process";
     steps.push({
       id,
       title: s.title.trim(),
@@ -64,8 +122,11 @@ export function parseExplanation(raw: string): ParseResult {
       branches: Array.isArray(s.branches)
         ? s.branches
             .filter(
-              (b): b is Record<string, unknown> & { when: string; to: string } =>
-                typeof b === "object" && b !== null &&
+              (
+                b
+              ): b is Record<string, unknown> & { when: string; to: string } =>
+                typeof b === "object" &&
+                b !== null &&
                 typeof (b as Record<string, unknown>).when === "string" &&
                 typeof (b as Record<string, unknown>).to === "string"
             )
@@ -87,10 +148,16 @@ export function parseExplanation(raw: string): ParseResult {
 
   for (const step of steps) {
     for (const b of step.branches ?? [])
-      if (!ids.has(b.to))
-        return { ok: false, error: `Step "${step.id}" branches to unknown step "${b.to}".` };
-    if (step.then && !ids.has(step.then))
-      return { ok: false, error: `Step "${step.id}" points to unknown step "${step.then}".` };
+      if (!stepIds.has(b.to))
+        return {
+          ok: false,
+          error: `View "${obj.title.trim()}" step "${step.id}" branches to unknown step "${b.to}".`,
+        };
+    if (step.then && !stepIds.has(step.then))
+      return {
+        ok: false,
+        error: `View "${obj.title.trim()}" step "${step.id}" points to unknown step "${step.then}".`,
+      };
   }
 
   const loops = Array.isArray(obj.loops)
@@ -103,7 +170,7 @@ export function parseExplanation(raw: string): ParseResult {
           color: typeof l.color === "string" ? l.color : undefined,
           line: asLine(l.line),
         }))
-        .filter((l) => ids.has(l.from) && ids.has(l.to))
+        .filter((l) => stepIds.has(l.from) && stepIds.has(l.to))
     : undefined;
 
   const actorSource = Array.isArray(obj.actors)
@@ -130,7 +197,7 @@ export function parseExplanation(raw: string): ParseResult {
           color: typeof g.color === "string" ? g.color : undefined,
           steps: (g.steps as unknown[])
             .filter((x): x is string => typeof x === "string")
-            .filter((id) => ids.has(id)),
+            .filter((id) => stepIds.has(id)),
           grid: isGroupGrid(g.grid) ? g.grid : undefined,
         }))
     : undefined;
@@ -150,6 +217,7 @@ export function parseExplanation(raw: string): ParseResult {
   return {
     ok: true,
     data: {
+      id: viewId,
       title: obj.title.trim(),
       summary: typeof obj.summary === "string" ? obj.summary : undefined,
       actors,
@@ -159,6 +227,10 @@ export function parseExplanation(raw: string): ParseResult {
     },
   };
 }
+
+type ParseResultForView =
+  | { ok: true; data: FlowView }
+  | { ok: false; error: string };
 
 function isGroupGrid(
   v: unknown

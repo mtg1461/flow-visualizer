@@ -81,3 +81,12 @@ export interface Explanation {
   /** Labeled regions clustering related steps. */
   groups?: Group[];
 }
+
+export type FlowView = Explanation & {
+  /** Stable id for this view inside a multi-view flow file. */
+  id: string;
+};
+
+export interface FlowFile {
+  views: FlowView[];
+}

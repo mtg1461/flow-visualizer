@@ -1,22 +1,21 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Explanation } from "@/lib/types";
 
 export const STORAGE_KEY = "flow-visualizer:data";
 
 const HISTORY_LIMIT = 100;
 const COALESCE_MS = 1000;
 
-type StabilizeDoc = (next: Explanation, previous: Explanation) => Explanation;
+type StabilizeDoc<T> = (next: T, previous: T) => T;
 
-interface Options {
-  initial: Explanation;
-  stabilize?: StabilizeDoc;
-  onRestore?: (doc: Explanation) => void;
+interface Options<T> {
+  initial: T;
+  stabilize?: StabilizeDoc<T>;
+  onRestore?: (doc: T) => void;
 }
 
-function persist(doc: Explanation | null) {
+function persist<T>(doc: T | null) {
   try {
     if (doc) localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
     else localStorage.removeItem(STORAGE_KEY);
@@ -25,22 +24,22 @@ function persist(doc: Explanation | null) {
   }
 }
 
-export function useEditorHistory({
+export function useEditorHistory<T>({
   initial,
   stabilize,
   onRestore,
-}: Options) {
-  const [doc, setDocState] = useState<Explanation>(() => initial);
+}: Options<T>) {
+  const [doc, setDocState] = useState<T>(() => initial);
   const [canUndo, setCanUndo] = useState(false);
 
   const docRef = useRef(doc);
   docRef.current = doc;
-  const past = useRef<Explanation[]>([]);
-  const future = useRef<Explanation[]>([]);
+  const past = useRef<T[]>([]);
+  const future = useRef<T[]>([]);
   const lastCommit = useRef({ key: "", at: 0 });
 
   const commit = useCallback(
-    (next: Explanation, coalesceKey?: string, shouldStabilize = true) => {
+    (next: T, coalesceKey?: string, shouldStabilize = true) => {
       if (shouldStabilize && stabilize)
         next = stabilize(next, docRef.current);
       const now = Date.now();

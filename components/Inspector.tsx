@@ -558,7 +558,17 @@ function DocPanel({
 
   return (
     <div>
-      <label className={`${labelCls} mt-0`} htmlFor="insp-summary">
+      <label className={`${labelCls} mt-0`} htmlFor="insp-doc-title">
+        Title
+      </label>
+      <input
+        id="insp-doc-title"
+        className={`${inputCls} text-[13.5px] font-medium`}
+        value={doc.title}
+        onChange={(e) => actions.updateDoc({ title: e.target.value })}
+      />
+
+      <label className={labelCls} htmlFor="insp-summary">
         Summary
       </label>
       <textarea

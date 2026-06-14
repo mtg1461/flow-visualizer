@@ -15,9 +15,9 @@ explore a sample.
 
 1. Copy the agent prompt — a short JSON contract.
 2. Hand it to a coding agent working in your repo.
-3. The agent writes a small flow JSON file.
+3. The agent writes a small flow JSON file with one or more views.
 4. Connect that file here — Browse or drag it in.
-5. Edit visually; changes save back to the file.
+5. Choose a view, edit visually, and switch views from the top-left selector.
 
 ## Run
 
@@ -28,17 +28,22 @@ npm run dev   # http://localhost:3000
 
 ## Connecting a file
 
-Browse to a `.json` flow file or drag it onto the start screen. Edits autosave
-to `localStorage` and write back to the connected file after a short pause; the
-watcher also reloads it if the file changes on disk. The **Agent Prompt** button
-hands an agent the JSON contract — try [examples/thermostat.json](examples/thermostat.json).
+Browse to a `.json` flow file or drag it onto the start screen. Valid files use
+a top-level `{ "views": [...] }` object; each view has its own title, steps,
+actors, loops, and groups. After opening a file, choose the view to enter. Edits
+autosave to `localStorage` and write back to the connected file after a short
+pause; the watcher also reloads it if the file changes on disk. The **Agent
+Prompt** button hands an agent the JSON contract — try
+[examples/thermostat.json](examples/thermostat.json).
 
-The data shape is `Explanation` in [lib/types.ts](lib/types.ts); layout and
-orthogonal routing live in [lib/graph.ts](lib/graph.ts).
+The file shape is `FlowFile` in [lib/types.ts](lib/types.ts); layout and
+orthogonal routing still operate on one active `FlowView` at a time in
+[lib/graph.ts](lib/graph.ts).
 
 ## Editing
 
 - Drag tiles to rearrange; **Tidy** re-runs the automatic layout.
+- Use the top-left selector to switch flow views.
 - Use the toolbar **Step** and **Group** buttons to add quickly.
 - Right-click the graph to add at a specific spot or open local actions.
 - Click a tile to edit it; click its port, then another tile, to connect.

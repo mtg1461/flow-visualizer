@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { EdgeLine, Explanation, Step } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EdgeLine, Explanation, FlowFile, FlowView, Step } from "@/lib/types";
 import {
   GRID_LIMITS,
   type EdgeRef,
@@ -29,7 +29,7 @@ import { useFileConnection } from "@/hooks/useFileConnection";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
 
 interface Props {
-  initial: Explanation;
+  initial: FlowFile;
 }
 
 /**
@@ -38,9 +38,9 @@ interface Props {
  * operations opt out by calling commit with stabilization disabled.
  */
 function stabilizeGroupMembers(
-  next: Explanation,
+  next: FlowView,
   prevPos: Map<string, Pos>
-): Explanation {
+): FlowView {
   const memberIds = new Set((next.groups ?? []).flatMap((g) => g.steps));
   if (memberIds.size === 0) return next;
   let changed = false;
@@ -90,6 +90,9 @@ function validSelection(
 }
 
 export function Editor({ initial }: Props) {
+  const [activeViewId, setActiveViewId] = useState(
+    () => initial.views[0]?.id ?? "main"
+  );
   const [selection, setSelection] = useState<Selection | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [agentPromptOpen, setAgentPromptOpen] = useState(false);
@@ -97,25 +100,62 @@ export function Editor({ initial }: Props) {
   const [disconnectOpen, setDisconnectOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [fitSignal, setFitSignal] = useState(0);
+  const activeViewIdRef = useRef(activeViewId);
+  activeViewIdRef.current = activeViewId;
 
-  const onRestore = useCallback((restored: Explanation) => {
-    setSelection((s) => validSelection(restored, s));
+  const onRestore = useCallback((restored: FlowFile) => {
+    const restoredView =
+      restored.views.find((view) => view.id === activeViewIdRef.current) ??
+      restored.views[0];
+    if (!restoredView) return;
+    if (restoredView.id !== activeViewIdRef.current)
+      setActiveViewId(restoredView.id);
+    setSelection((s) => validSelection(restoredView, s));
     setConnectFrom(null);
   }, []);
 
-  const stabilizeDoc = useCallback((next: Explanation, previous: Explanation) => {
-    return stabilizeGroupMembers(next, layoutPositions(previous));
-  }, []);
-
-  const { doc, docRef, commit, undo, redo, canUndo } = useEditorHistory({
-    initial: normalize(initial),
-    stabilize: stabilizeDoc,
+  const { doc: fileDoc, docRef: fileRef, commit: commitFile, undo, redo, canUndo } = useEditorHistory<FlowFile>({
+    initial: { views: initial.views.map((view) => normalize(view)) },
     onRestore,
   });
 
-  const onFileConnected = useCallback(() => {
+  const activeView =
+    fileDoc.views.find((view) => view.id === activeViewId) ?? fileDoc.views[0]!;
+  const doc = activeView;
+  const docRef = useRef(doc);
+  docRef.current = doc;
+
+  const commit = useCallback(
+    (next: Explanation, coalesceKey?: string, shouldStabilize = true) => {
+      const currentFile = fileRef.current;
+      const viewId = activeViewIdRef.current;
+      const currentView =
+        currentFile.views.find((view) => view.id === viewId) ??
+        currentFile.views[0];
+      if (!currentView) return;
+      const nextViewBase = { ...next, id: currentView.id } as FlowView;
+      const nextView = shouldStabilize
+        ? stabilizeGroupMembers(nextViewBase, layoutPositions(currentView))
+        : nextViewBase;
+      commitFile(
+        {
+          ...currentFile,
+          views: currentFile.views.map((view) =>
+            view.id === currentView.id ? nextView : view
+          ),
+        },
+        coalesceKey,
+        false
+      );
+    },
+    [commitFile, fileRef]
+  );
+
+  const onFileConnected = useCallback((viewId: string) => {
+    setActiveViewId(viewId);
     setSelection(null);
     setConnectFrom(null);
+    setMenu(null);
     setFitSignal((s) => s + 1);
   }, []);
 
@@ -127,13 +167,33 @@ export function Editor({ initial }: Props) {
   }, []);
 
   const fileConnection = useFileConnection({
-    doc,
-    commit,
+    file: fileDoc,
+    activeViewId,
+    commit: commitFile,
     onConnected: onFileConnected,
     onDisconnected: onFileDisconnected,
   });
 
   const positions = useMemo(() => layoutPositions(doc), [doc]);
+  const viewOptions = useMemo(
+    () =>
+      fileDoc.views.map((view) => ({
+        id: view.id,
+        title: view.title,
+        summary: view.summary,
+        stepCount: view.steps.length,
+      })),
+    [fileDoc.views]
+  );
+
+  const switchView = useCallback((id: string) => {
+    if (id === activeViewIdRef.current) return;
+    setActiveViewId(id);
+    setSelection(null);
+    setConnectFrom(null);
+    setMenu(null);
+    setFitSignal((s) => s + 1);
+  }, []);
 
   /* ------------------------------------------------------- mutations */
 
@@ -834,15 +894,16 @@ export function Editor({ initial }: Props) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg">
       <Toolbar
-        title={doc.title}
+        views={viewOptions}
+        activeViewId={activeViewId}
         connectionName={fileConnection.connectionName}
         status={fileConnection.status}
         canUndo={canUndo}
         onUndo={undo}
         onAddStep={() => addStep()}
         onAddGroup={addGroupFromToolbar}
+        onViewSelect={switchView}
         onTidy={tidy}
-        onTitle={(title) => commit({ ...doc, title }, "doc:title")}
         onAgentPrompt={() => setAgentPromptOpen(true)}
         onDisconnect={() => setDisconnectOpen(true)}
       />

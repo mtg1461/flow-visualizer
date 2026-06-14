@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConnectionPreview, FileSyncStatus } from "@/components/ConnectionScreen";
-import type { Explanation } from "@/lib/types";
-import { parseExplanation } from "@/lib/parse";
+import type { FlowFile } from "@/lib/types";
+import { parseFlowFile } from "@/lib/parse";
 import {
   denormalize,
   normalize,
@@ -16,10 +16,15 @@ import { LOCAL_FILES_ENABLED } from "@/lib/config";
  *  on a hosted build. Browser-handle connections aren't restorable here. */
 const LAST_PATH_KEY = "flow-visualizer:lastPath";
 
-/** Starter document written when the user creates a new empty flow. */
-const EMPTY_FLOW: Explanation = {
-  title: "Untitled flow",
-  steps: [{ id: "step-1", title: "New step", kind: "process" }],
+/** Starter document written when the user creates a new empty flow file. */
+const EMPTY_FLOW: FlowFile = {
+  views: [
+    {
+      id: "main",
+      title: "Untitled flow",
+      steps: [{ id: "step-1", title: "New step", kind: "process" }],
+    },
+  ],
 };
 
 function rememberPath(p: string) {
@@ -76,18 +81,21 @@ interface BrowserFileConnection {
 type PendingConnection =
   | (LocalFileRead & {
       kind: "path";
-      preview: Explanation;
-      normalized: Explanation;
+      normalized: FlowFile;
       sourceName: string;
     })
   | {
       kind: "browser";
-      preview: Explanation;
-      normalized: Explanation;
+      normalized: FlowFile;
       sourceName: string;
       lastModified: number;
       size: number;
       handle: BrowserFileHandle;
+    }
+  | {
+      kind: "example";
+      normalized: FlowFile;
+      sourceName: string;
     };
 
 declare global {
@@ -102,9 +110,10 @@ declare global {
 }
 
 interface Options {
-  doc: Explanation;
-  commit: (next: Explanation, coalesceKey?: string, stabilize?: boolean) => void;
-  onConnected: () => void;
+  file: FlowFile;
+  activeViewId: string;
+  commit: (next: FlowFile, coalesceKey?: string, stabilize?: boolean) => void;
+  onConnected: (viewId: string) => void;
   onDisconnected: () => void;
 }
 
@@ -118,8 +127,18 @@ function singleDroppedPath(text: string) {
   return lines[0] ?? "";
 }
 
-function serializeDoc(doc: Explanation) {
-  return JSON.stringify(denormalize(doc), null, 2);
+function prepareFile(file: FlowFile): FlowFile {
+  return {
+    views: file.views.map((view) => tidyLayout(normalize(view))),
+  };
+}
+
+function serializeDoc(file: FlowFile) {
+  return JSON.stringify(
+    { views: file.views.map((view) => denormalize(view)) },
+    null,
+    2
+  );
 }
 
 async function postFileApi<T>(
@@ -151,16 +170,24 @@ function isBrowserFileHandle(handle: unknown): handle is BrowserFileHandle {
 
 function toConnectionPreview(
   sourceName: string,
-  canRequestWrite: boolean
+  canRequestWrite: boolean,
+  file: FlowFile
 ): ConnectionPreview {
   return {
     sourceName,
     canRequestWrite,
+    views: file.views.map((view) => ({
+      id: view.id,
+      title: view.title,
+      summary: view.summary,
+      stepCount: view.steps.length,
+    })),
   };
 }
 
 export function useFileConnection({
-  doc,
+  file,
+  activeViewId,
   commit,
   onConnected,
   onDisconnected,
@@ -177,7 +204,7 @@ export function useFileConnection({
   // so nothing saves back to disk and nothing is polled.
   const [exampleMode, setExampleMode] = useState(false);
 
-  const lastFileJson = useRef(serializeDoc(doc));
+  const lastFileJson = useRef(serializeDoc(file));
   const saveTimer = useRef<number | null>(null);
   const readingFile = useRef(false);
 
@@ -190,7 +217,8 @@ export function useFileConnection({
         ? toConnectionPreview(
             pendingConnection.sourceName,
             pendingConnection.kind === "browser" &&
-              !!pendingConnection.handle.requestPermission
+              !!pendingConnection.handle.requestPermission,
+            pendingConnection.normalized
           )
         : null,
     [pendingConnection]
@@ -207,6 +235,14 @@ export function useFileConnection({
     }
   }, []);
 
+  const viewIdFor = useCallback(
+    (next: FlowFile) =>
+      next.views.some((view) => view.id === activeViewId)
+        ? activeViewId
+        : next.views[0].id,
+    [activeViewId]
+  );
+
   const previewPath = useCallback(async (nextPath: string) => {
     const wanted = nextPath.trim();
     if (!wanted) {
@@ -219,13 +255,12 @@ export function useFileConnection({
     setStatus("loading");
     try {
       const data = await postFileApi<LocalFileRead>("read", { path: wanted });
-      const result = parseExplanation(data.contents);
+      const result = parseFlowFile(data.contents);
       if (!result.ok) throw new Error(result.error);
-      const normalized = tidyLayout(normalize(result.data));
+      const normalized = prepareFile(result.data);
       setPendingConnection({
         ...data,
         kind: "path",
-        preview: result.data,
         normalized,
         sourceName: data.path,
       });
@@ -252,12 +287,11 @@ export function useFileConnection({
     setStatus("loading");
     try {
       const file = await handle.getFile();
-      const result = parseExplanation(await file.text());
+      const result = parseFlowFile(await file.text());
       if (!result.ok) throw new Error(result.error);
-      const normalized = tidyLayout(normalize(result.data));
+      const normalized = prepareFile(result.data);
       setPendingConnection({
         kind: "browser",
-        preview: result.data,
         normalized,
         sourceName: handle.name || file.name || "flow.json",
         lastModified: file.lastModified,
@@ -304,9 +338,9 @@ export function useFileConnection({
       setStatus(source === "watch" ? "external" : "loading");
       try {
         const data = await postFileApi<LocalFileRead>("read", { path: wanted });
-        const result = parseExplanation(data.contents);
+        const result = parseFlowFile(data.contents);
         if (!result.ok) throw new Error(result.error);
-        const next = tidyLayout(normalize(result.data));
+        const next = prepareFile(result.data);
         lastFileJson.current = serializeDoc(next);
         setPathState(data.path);
         setBoundFile({
@@ -315,9 +349,10 @@ export function useFileConnection({
           size: data.size,
         });
         setBrowserFile(null);
+        setExampleMode(false);
         rememberPath(data.path);
         commit(next, undefined, false);
-        onConnected();
+        onConnected(viewIdFor(next));
         settleStatus(source === "watch" ? "external" : "watching");
       } catch (loadError) {
         setError(
@@ -330,14 +365,11 @@ export function useFileConnection({
         }, 0);
       }
     },
-    [commit, onConnected, path, settleStatus]
+    [commit, onConnected, path, settleStatus, viewIdFor]
   );
 
-  // Reconnect the last disk path after a refresh (a dev Fast-Refresh full
-  // reload otherwise drops the connection silently). Path connections only
-  // exist in local dev, so this never runs on a hosted build. Runs once.
-  const loadPathRef = useRef(loadPath);
-  loadPathRef.current = loadPath;
+  // Re-offer the last disk path after a refresh. The user still chooses which
+  // view to open, so reconnect follows the same selector path as fresh opens.
   const triedReconnect = useRef(false);
   useEffect(() => {
     if (triedReconnect.current || !LOCAL_FILES_ENABLED) return;
@@ -348,7 +380,7 @@ export function useFileConnection({
     } catch {
       saved = "";
     }
-    if (saved) loadPathRef.current(saved, "manual");
+    if (saved) setPathState(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -367,11 +399,12 @@ export function useFileConnection({
       setStatus(source === "watch" ? "external" : "loading");
       try {
         const file = await handle.getFile();
-        const result = parseExplanation(await file.text());
+        const result = parseFlowFile(await file.text());
         if (!result.ok) throw new Error(result.error);
-        const next = tidyLayout(normalize(result.data));
+        const next = prepareFile(result.data);
         lastFileJson.current = serializeDoc(next);
         setBoundFile(null);
+        setExampleMode(false);
         setBrowserFile({
           name: handle.name || file.name || "flow.json",
           lastModified: file.lastModified,
@@ -379,7 +412,7 @@ export function useFileConnection({
           handle,
         });
         commit(next, undefined, false);
-        onConnected();
+        onConnected(viewIdFor(next));
         settleStatus(source === "watch" ? "external" : "watching");
       } catch (loadError) {
         setError(
@@ -392,7 +425,7 @@ export function useFileConnection({
         }, 0);
       }
     },
-    [commit, onConnected, settleStatus]
+    [commit, onConnected, settleStatus, viewIdFor]
   );
 
   const browseFile = useCallback(async () => {
@@ -454,7 +487,7 @@ export function useFileConnection({
       await writable.write(`${serializeDoc(EMPTY_FLOW)}\n`);
       await writable.close();
       setPathState("");
-      await connectBrowserHandle(handle);
+      await previewBrowserHandle(handle);
     } catch (createError) {
       const name = createError instanceof Error ? createError.name : "";
       if (name === "AbortError") return; // user dismissed the picker
@@ -465,7 +498,7 @@ export function useFileConnection({
       );
       setStatus("error");
     }
-  }, [connectBrowserHandle]);
+  }, [previewBrowserHandle]);
 
   const connectDropped = useCallback(
     async (dataTransfer: DataTransfer) => {
@@ -526,12 +559,15 @@ export function useFileConnection({
       throw new Error("This browser did not provide write access for the selected file.");
   }, []);
 
-  const connectPending = useCallback(async () => {
+  const connectPending = useCallback(async (selectedViewId: string) => {
     if (!pendingConnection) return;
     setError(null);
     setStatus("loading");
     try {
       const next = pendingConnection.normalized;
+      const nextViewId = next.views.some((view) => view.id === selectedViewId)
+        ? selectedViewId
+        : next.views[0].id;
       lastFileJson.current = serializeDoc(next);
       if (pendingConnection.kind === "path") {
         setBoundFile({
@@ -540,21 +576,28 @@ export function useFileConnection({
           size: pendingConnection.size,
         });
         setBrowserFile(null);
+        setExampleMode(false);
         rememberPath(pendingConnection.path);
-      } else {
+      } else if (pendingConnection.kind === "browser") {
         await requestBrowserWrite(pendingConnection.handle);
         setBoundFile(null);
+        setExampleMode(false);
         setBrowserFile({
           name: pendingConnection.sourceName,
           lastModified: pendingConnection.lastModified,
           size: pendingConnection.size,
           handle: pendingConnection.handle,
         });
+      } else {
+        setBoundFile(null);
+        setBrowserFile(null);
+        setExampleMode(true);
+        forgetPath();
       }
       setPendingConnection(null);
       commit(next, undefined, false);
-      onConnected();
-      settleStatus("watching");
+      onConnected(nextViewId);
+      settleStatus(pendingConnection.kind === "example" ? "example" : "watching");
     } catch (connectError) {
       setError(
         connectError instanceof Error
@@ -565,26 +608,21 @@ export function useFileConnection({
     }
   }, [commit, onConnected, pendingConnection, requestBrowserWrite, settleStatus]);
 
-  // Open the canvas on the built-in example, fetched from the server, with no
-  // file bound. Edits live in localStorage but never write back to disk.
+  // Preview the built-in example, fetched from the server, with no file bound.
   const loadExample = useCallback(async () => {
     setError(null);
     setStatus("loading");
     try {
       const res = await fetch("/api/example", { cache: "no-store" });
       if (!res.ok) throw new Error("Could not load the example flow.");
-      const result = parseExplanation(await res.text());
+      const result = parseFlowFile(await res.text());
       if (!result.ok) throw new Error(result.error);
-      const next = tidyLayout(normalize(result.data));
-      lastFileJson.current = serializeDoc(next);
-      setBoundFile(null);
-      setBrowserFile(null);
-      setPendingConnection(null);
-      forgetPath();
-      setExampleMode(true);
-      commit(next, undefined, false);
-      onConnected();
-      setStatus("example");
+      setPendingConnection({
+        kind: "example",
+        sourceName: "Example flow",
+        normalized: prepareFile(result.data),
+      });
+      setStatus("watching");
     } catch (exampleError) {
       setError(
         exampleError instanceof Error
@@ -593,11 +631,11 @@ export function useFileConnection({
       );
       setStatus("error");
     }
-  }, [commit, onConnected]);
+  }, []);
 
   useEffect(() => {
     if ((!boundFile && !browserFile) || readingFile.current) return;
-    const contents = serializeDoc(doc);
+    const contents = serializeDoc(file);
     if (contents === lastFileJson.current) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     setStatus("saving");
@@ -639,7 +677,7 @@ export function useFileConnection({
         saveTimer.current = null;
       }
     };
-  }, [boundFile, browserFile, doc, settleStatus]);
+  }, [boundFile, browserFile, file, settleStatus]);
 
   useEffect(() => {
     if (!boundFile) return;
@@ -724,6 +762,7 @@ export function useFileConnection({
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
+    setPathState("");
     setBoundFile(null);
     setBrowserFile(null);
     setExampleMode(false);
