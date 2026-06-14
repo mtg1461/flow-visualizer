@@ -15,7 +15,7 @@
           "id": "read",
           "title": "The room is measured",
           "detail": "The sensor samples the air every few seconds. Everything downstream trusts this single number.",
-          "kind": "input",
+          "kind": "trigger",
           "actor": "sensor"
         },
         {

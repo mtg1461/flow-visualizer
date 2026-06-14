@@ -6,7 +6,14 @@ import type {
   StepKind,
 } from "./types";
 
-const KINDS: StepKind[] = ["input", "process", "decision", "output", "wait"];
+const KINDS: StepKind[] = [
+  "trigger",
+  "input",
+  "process",
+  "decision",
+  "output",
+  "wait",
+];
 const LINES: EdgeLine[] = ["solid", "dashed", "dotted"];
 
 function asLine(v: unknown): EdgeLine | undefined {

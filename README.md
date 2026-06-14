@@ -47,6 +47,8 @@ orthogonal routing still operate on one active `FlowView` at a time in
 - Use the toolbar **Step** and **Group** buttons to add quickly.
 - Right-click the graph to add at a specific spot or open local actions.
 - Click a tile to edit it; click its port, then another tile, to connect.
+- Use **Trigger** for the event that starts or wakes a flow; trigger tiles
+  default to red.
 - Click any edge to restyle it — label, line (solid/dashed/dotted), and color.
 - Cluster steps into labeled group regions; give tiles and edges custom colors.
 - `Delete` removes the selection, `Esc` deselects.

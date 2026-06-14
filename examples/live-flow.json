@@ -26,7 +26,7 @@
           "id": "choose-file",
           "title": "Choose a local flow file",
           "detail": "Enter an absolute or project-relative JSON path in the File dialog.",
-          "kind": "input",
+          "kind": "trigger",
           "actor": "visualizer",
           "grid": {
             "col": 0,

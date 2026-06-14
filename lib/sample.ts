@@ -19,7 +19,7 @@ export const SAMPLE: FlowFile = {
           title: "A feature request arrives",
           detail:
             "One or two sentences of intent. Everything downstream is the agent translating this into working code.",
-          kind: "input",
+          kind: "trigger",
           actor: "user",
         },
         {

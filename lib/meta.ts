@@ -1,6 +1,7 @@
 import type { Explanation, StepKind } from "./types";
 
 export const KIND_META: Record<StepKind, { label: string; color: string }> = {
+  trigger: { label: "Trigger", color: "#ff6b6b" },
   input: { label: "Input", color: "#7fd6c2" },
   process: { label: "Process", color: "#9b9bff" },
   decision: { label: "Decision", color: "#eec27a" },

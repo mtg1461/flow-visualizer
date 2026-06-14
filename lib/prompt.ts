@@ -15,7 +15,7 @@ Use this JSON shape (output valid JSON only — no comments, no trailing commas)
           "id": "short-slug",
           "title": "Short verb phrase",
           "detail": "One or two plain sentences: what happens and why it matters downstream.",
-          "kind": "input | process | decision | output | wait",
+          "kind": "trigger | input | process | decision | output | wait",
           "actor": "actor-id",
           "branches": [{ "when": "minimal condition", "to": "step-id" }],
           "then": "step-id"
@@ -34,7 +34,7 @@ How to model it well:
 - Steps flow to the next listed step automatically — omit "then" for plain sequence. Set "then" only to jump elsewhere: skip ahead, merge two paths into one step, or loop back.
 - Make decisions real forks: "kind": "decision" with 2-3 mutually exclusive "branches", each leading to a DIFFERENT step so the paths actually diverge. Keep each branch "when" condition minimal, ideally 1-4 words, not a sentence. Let those paths run a few steps, then rejoin with a shared "then" if they merge. A step that always continues to one place is a process, not a decision.
 - Use "loops" (or a backward "then"/branch) only for genuine feedback — a later outcome that revises earlier state. One or two is normal; do not wire a loop from every step.
-- "input" is the trigger, "output" the result, "wait" pauses for an external event; everything else is "process". Give each step the actor that performs it.
+- "trigger" is the event that starts or wakes the flow; use it for the first external cause. "input" is data or material entering an already-started flow, "output" is the result, and "wait" pauses for an external event; everything else is "process". Give each step the actor that performs it.
 - Cluster related steps into "groups" by phase or subsystem when two or more belong together.
 - Keep each view tight and honest: roughly 6-14 steps, stable lowercase unique ids, every referenced id present, no orphan steps.
 - Omit layout and styling fields: step/group "grid", step/group color overrides, and edge color/line overrides. The app and user handle placement and coloring.`;

@@ -1,6 +1,12 @@
 /** The shape an AI agent produces to describe how something works. */
 
-export type StepKind = "input" | "process" | "decision" | "output" | "wait";
+export type StepKind =
+  | "trigger"
+  | "input"
+  | "process"
+  | "decision"
+  | "output"
+  | "wait";
 
 export interface Actor {
   id: string;
