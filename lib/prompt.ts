@@ -5,8 +5,8 @@ Use this JSON shape (output valid JSON only — no comments, no trailing commas)
   "views": [
     {
       "id": "short-view-slug",
-      "title": "How <subject> works",
-      "summary": "One sentence naming the core mechanism.",
+      "title": "Short view name",
+      "summary": "Brief view description.",
       "actors": [
         { "id": "short-slug", "name": "Actor name", "role": "what it owns or decides" }
       ],
@@ -30,6 +30,7 @@ Use this JSON shape (output valid JSON only — no comments, no trailing commas)
 How to model it well:
 - Always wrap flows in the top-level "views" array. A file with one flow still has one view.
 - Use multiple views only when the subject has distinct perspectives that would be crowded in one chart, such as request lifecycle, data model, and background jobs.
+- Keep view titles and summaries concise: titles should be short names, and summaries should be one short sentence.
 - Steps flow to the next listed step automatically — omit "then" for plain sequence. Set "then" only to jump elsewhere: skip ahead, merge two paths into one step, or loop back.
 - Make decisions real forks: "kind": "decision" with 2-3 mutually exclusive "branches", each leading to a DIFFERENT step so the paths actually diverge. Keep each branch "when" condition minimal, ideally 1-4 words, not a sentence. Let those paths run a few steps, then rejoin with a shared "then" if they merge. A step that always continues to one place is a process, not a decision.
 - Use "loops" (or a backward "then"/branch) only for genuine feedback — a later outcome that revises earlier state. One or two is normal; do not wire a loop from every step.
