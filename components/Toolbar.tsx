@@ -118,9 +118,9 @@ export function Toolbar({
                   onAddView();
                   setOpen(false);
                 }}
-                className="flex size-6 cursor-pointer items-center justify-center rounded-md border border-line bg-well text-mute transition-colors hover:border-accent/50 hover:text-accent"
+                className="flex size-7 cursor-pointer items-center justify-center rounded-md border border-accent/70 bg-accent text-bg shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0"
               >
-                <Plus size={13} />
+                <Plus size={15} strokeWidth={2.7} />
               </button>
             </div>
             <div className="max-h-[420px] overflow-y-auto">
