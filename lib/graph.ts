@@ -246,10 +246,49 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
 
   const fwd = buildEdges(doc).filter((e) => e.kind !== "loop" && !e.backward);
   const preds = new Map<string, string[]>();
+  const succs = new Map<string, string[]>();
   for (const e of fwd) {
     const arr = preds.get(e.to) ?? [];
     arr.push(e.from);
     preds.set(e.to, arr);
+    const out = succs.get(e.from) ?? [];
+    out.push(e.to);
+    succs.set(e.from, out);
+  }
+
+  const groupOf = new Map<string, string>();
+  for (const g of doc.groups ?? []) {
+    for (const sid of g.steps) if (!groupOf.has(sid)) groupOf.set(sid, g.id);
+  }
+  const sourceSlots = new Map<string, Pos>();
+  const sourceBuckets: { key: string; ids: string[] }[] = [];
+  const bucketOf = new Map<string, { key: string; ids: string[] }>();
+  const sourceBucketKey = (id: string) => {
+    const groupId = groupOf.get(id);
+    if (groupId) return `group:${groupId}`;
+    const tos = succs.get(id);
+    return tos?.length ? `to:${[...tos].sort().join("|")}` : "loose";
+  };
+  for (const s of steps) {
+    if (pos.has(s.id) || (preds.get(s.id)?.length ?? 0) > 0) continue;
+    const key = sourceBucketKey(s.id);
+    let bucket = bucketOf.get(key);
+    if (!bucket) {
+      bucket = { key, ids: [] };
+      bucketOf.set(key, bucket);
+      sourceBuckets.push(bucket);
+    }
+    bucket.ids.push(s.id);
+  }
+  let sourceRow = 0;
+  for (const bucket of sourceBuckets) {
+    const cols = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(bucket.ids.length))));
+    for (const [i, id] of bucket.ids.entries()) {
+      const row = sourceRow + Math.floor(i / cols);
+      const col = (i % cols) - Math.floor((cols - 1) / 2);
+      sourceSlots.set(id, { col, row });
+    }
+    sourceRow += Math.ceil(bucket.ids.length / cols);
   }
 
   // Forward edges always point to a later array index, so array order is
@@ -261,8 +300,10 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
       return;
     }
     const ps = preds.get(s.id) ?? [];
+    const sourceSlot = sourceSlots.get(s.id);
     let r: number;
     if (ps.length) r = Math.max(...ps.map((p) => (rowOf.get(p) ?? 0) + 1));
+    else if (sourceSlot) r = sourceSlot.row;
     else r = i === 0 ? 0 : (rowOf.get(steps[i - 1].id) ?? 0) + 1;
     rowOf.set(s.id, r);
   });
@@ -272,8 +313,11 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
     if (pos.has(s.id)) return;
     const r = rowOf.get(s.id)!;
     const ps = preds.get(s.id) ?? [];
+    const sourceSlot = sourceSlots.get(s.id);
     let desired = 0;
-    if (ps.length) {
+    if (sourceSlot) {
+      desired = sourceSlot.col;
+    } else if (ps.length) {
       const primary = ps[0];
       const outs = fwd.filter((e) => e.from === primary).map((e) => e.to);
       const k = Math.max(0, outs.indexOf(s.id));
