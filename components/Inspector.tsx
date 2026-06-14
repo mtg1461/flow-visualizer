@@ -16,7 +16,13 @@ import type {
   Step,
   StepKind,
 } from "@/lib/types";
-import { KIND_META, STEP_PALETTE, actorColors, withAlpha } from "@/lib/meta";
+import {
+  KIND_META,
+  STEP_PALETTE,
+  actorColors,
+  groupColors,
+  withAlpha,
+} from "@/lib/meta";
 import { type EdgeRef, type Selection } from "@/lib/graph";
 
 export interface EditorActions {
@@ -466,7 +472,7 @@ function GroupPanel({
 }) {
   if (!group) return null;
   const titleOf = new Map(doc.steps.map((s) => [s.id, s.title]));
-  const color = group.color ?? "#9b9bff";
+  const color = groupColors(doc).get(group.id) ?? "#9b9bff";
 
   return (
     <div>
@@ -553,6 +559,7 @@ function DocPanel({
   actions: EditorActions;
 }) {
   const colors = actorColors(doc);
+  const groupColorMap = groupColors(doc);
   const actors = doc.actors ?? [];
   const groups = doc.groups ?? [];
 
@@ -650,7 +657,7 @@ function DocPanel({
           </span>
           <div className="mt-2 space-y-2">
             {groups.map((g) => {
-              const color = g.color ?? "#9b9bff";
+              const color = groupColorMap.get(g.id) ?? "#9b9bff";
               const next =
                 STEP_PALETTE[
                   (STEP_PALETTE.indexOf(color) + 1) % STEP_PALETTE.length

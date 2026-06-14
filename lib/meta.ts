@@ -20,6 +20,17 @@ export const STEP_PALETTE = [
   "#f2a98c",
 ];
 
+const GROUP_PALETTE = [
+  "#7fd6c2",
+  "#9b9bff",
+  "#eec27a",
+  "#ef9cbe",
+  "#8fc7f2",
+  "#b8d491",
+  "#c8b1f7",
+  "#f2a98c",
+];
+
 const ACTOR_PALETTE = [
   "#9b9bff",
   "#7fd6c2",
@@ -38,6 +49,15 @@ export function actorColors(data: Explanation): Map<string, string> {
   const used = data.steps.map((s) => s.actor).filter((p): p is string => !!p);
   for (const id of [...declared, ...used]) {
     if (!map.has(id)) map.set(id, ACTOR_PALETTE[map.size % ACTOR_PALETTE.length]);
+  }
+  return map;
+}
+
+/** Stable color per group, with explicit group.color overrides preserved. */
+export function groupColors(data: Explanation): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [index, group] of (data.groups ?? []).entries()) {
+    map.set(group.id, group.color ?? GROUP_PALETTE[index % GROUP_PALETTE.length]);
   }
   return map;
 }

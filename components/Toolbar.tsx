@@ -30,6 +30,7 @@ interface Props {
   onUndo: () => void;
   onAddStep: () => void;
   onAddGroup: () => void;
+  onAddView: () => void;
   onViewSelect: (id: string) => void;
   onTidy: () => void;
   onAgentPrompt: () => void;
@@ -45,6 +46,7 @@ export function Toolbar({
   onUndo,
   onAddStep,
   onAddGroup,
+  onAddView,
   onViewSelect,
   onTidy,
   onAgentPrompt,
@@ -104,42 +106,61 @@ export function Toolbar({
         </button>
         {open && (
           <div className="anim-pop absolute left-0 top-10 z-50 w-[340px] rounded-xl border border-line-strong bg-raise p-1.5 shadow-2xl shadow-black/45">
-            {views.map((view) => {
-              const selected = view.id === activeViewId;
-              return (
-                <button
-                  key={view.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onViewSelect(view.id);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                    selected
-                      ? "bg-accent/15 text-text"
-                      : "text-mute hover:bg-line hover:text-text"
-                  }`}
-                >
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-accent">
-                    {selected ? <Check size={13} /> : <GitBranch size={13} />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-medium">
-                      {view.title}
+            <div className="mb-1 flex items-center justify-between border-b border-line px-2 py-1.5">
+              <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-faint">
+                Views
+              </span>
+              <button
+                type="button"
+                title="Add view"
+                aria-label="Add view"
+                onClick={() => {
+                  onAddView();
+                  setOpen(false);
+                }}
+                className="flex size-6 cursor-pointer items-center justify-center rounded-md border border-line bg-well text-mute transition-colors hover:border-accent/50 hover:text-accent"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+            <div className="max-h-[420px] overflow-y-auto">
+              {views.map((view) => {
+                const selected = view.id === activeViewId;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onViewSelect(view.id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                      selected
+                        ? "bg-accent/15 text-text"
+                        : "text-mute hover:bg-line hover:text-text"
+                    }`}
+                  >
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-accent">
+                      {selected ? <Check size={13} /> : <GitBranch size={13} />}
                     </span>
-                    {view.summary && (
-                      <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-faint">
-                        {view.summary}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium">
+                        {view.title}
                       </span>
-                    )}
-                    <span className="mt-1 block text-[10.5px] uppercase tracking-[0.12em] text-faint">
-                      {view.stepCount} steps
+                      {view.summary && (
+                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-faint">
+                          {view.summary}
+                        </span>
+                      )}
+                      <span className="mt-1 block text-[10.5px] uppercase tracking-[0.12em] text-faint">
+                        {view.stepCount} steps
+                      </span>
                     </span>
-                  </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

@@ -27,6 +27,7 @@ import { HowItWorksDialog } from "./HowItWorksDialog";
 import { useEditorHistory } from "@/hooks/useEditorHistory";
 import { useFileConnection } from "@/hooks/useFileConnection";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
+import { groupColors } from "@/lib/meta";
 
 interface Props {
   initial: FlowFile;
@@ -87,6 +88,14 @@ function validSelection(
       ? sel
       : null;
   return (doc.loops?.length ?? 0) > ref.index ? sel : null;
+}
+
+function nextViewId(views: FlowView[]) {
+  const used = new Set(views.map((view) => view.id));
+  let n = views.length + 1;
+  let id = `view-${n}`;
+  while (used.has(id)) id = `view-${++n}`;
+  return id;
 }
 
 export function Editor({ initial }: Props) {
@@ -175,6 +184,7 @@ export function Editor({ initial }: Props) {
   });
 
   const positions = useMemo(() => layoutPositions(doc), [doc]);
+  const groupColorMap = useMemo(() => groupColors(doc), [doc]);
   const viewOptions = useMemo(
     () =>
       fileDoc.views.map((view) => ({
@@ -188,12 +198,37 @@ export function Editor({ initial }: Props) {
 
   const switchView = useCallback((id: string) => {
     if (id === activeViewIdRef.current) return;
+    activeViewIdRef.current = id;
     setActiveViewId(id);
     setSelection(null);
     setConnectFrom(null);
     setMenu(null);
     setFitSignal((s) => s + 1);
   }, []);
+
+  const addView = useCallback(() => {
+    const currentFile = fileRef.current;
+    const id = nextViewId(currentFile.views);
+    const newView: FlowView = {
+      id,
+      title: "Untitled view",
+      steps: [{ id: "step-1", title: "New step", kind: "process" }],
+    };
+    commitFile(
+      {
+        ...currentFile,
+        views: [...currentFile.views, normalize(newView)],
+      },
+      undefined,
+      false
+    );
+    activeViewIdRef.current = id;
+    setActiveViewId(id);
+    setSelection(null);
+    setConnectFrom(null);
+    setMenu(null);
+    setFitSignal((s) => s + 1);
+  }, [commitFile, fileRef]);
 
   /* ------------------------------------------------------- mutations */
 
@@ -902,6 +937,7 @@ export function Editor({ initial }: Props) {
         onUndo={undo}
         onAddStep={() => addStep()}
         onAddGroup={addGroupFromToolbar}
+        onAddView={addView}
         onViewSelect={switchView}
         onTidy={tidy}
         onAgentPrompt={() => setAgentPromptOpen(true)}
@@ -934,9 +970,8 @@ export function Editor({ initial }: Props) {
                     (s) => s.id === (menu.target as { id: string }).id
                   )?.color
                 : menu.target.type === "group"
-                  ? (doc.groups?.find(
-                      (g) => g.id === (menu.target as { id: string }).id
-                    )?.color ?? "#9b9bff")
+                  ? (groupColorMap.get((menu.target as { id: string }).id) ??
+                    "#9b9bff")
                   : undefined
             }
             canDelete={doc.steps.length > 1}

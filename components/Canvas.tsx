@@ -10,7 +10,7 @@ import {
 } from "react";
 import { GripVertical, Maximize2, Minus, Plus } from "lucide-react";
 import type { Explanation } from "@/lib/types";
-import { actorColors, withAlpha } from "@/lib/meta";
+import { actorColors, groupColors, withAlpha } from "@/lib/meta";
 import type { MenuTarget } from "./ContextMenu";
 import {
   CELL_H,
@@ -133,6 +133,7 @@ export function Canvas({
   } | null>(null);
 
   const colors = useMemo(() => actorColors(doc), [doc]);
+  const groupColorMap = useMemo(() => groupColors(doc), [doc]);
   const actorsById = useMemo(
     () => new Map((doc.actors ?? []).map((p) => [p.id, p])),
     [doc]
@@ -545,7 +546,7 @@ export function Canvas({
         return {
           id: g.id,
           label: g.label,
-          color: g.color ?? "#9b9bff",
+          color: groupColorMap.get(g.id) ?? "#9b9bff",
           invalid: groupDrag?.id === g.id && !groupDrag.valid,
           left: rect.minC * CELL_W + GX - 18,
           top: rect.minR * CELL_H + GY - 34,
@@ -554,7 +555,7 @@ export function Canvas({
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [previewGroups, livePositions, groupDrag, groupResize]);
+  }, [previewGroups, livePositions, groupDrag, groupResize, groupColorMap]);
 
   // group dragging — moves every member tile by a cell delta
   const groupDragRef = useRef<{
