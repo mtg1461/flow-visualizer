@@ -390,13 +390,23 @@ function EdgePanel({
       <label className={labelCls} htmlFor="insp-edge-label">
         {edgeRef.type === "branch" ? "Condition" : "Label"}
       </label>
-      <input
-        id="insp-edge-label"
-        className={inputCls}
-        value={label ?? ""}
-        placeholder={edgeRef.type === "branch" ? "when…" : "optional label…"}
-        onChange={(e) => actions.updateEdgeLabel(edgeRef, e.target.value)}
-      />
+      {edgeRef.type === "branch" ? (
+        <textarea
+          id="insp-edge-label"
+          className={`${inputCls} h-24 resize-none leading-relaxed`}
+          value={label ?? ""}
+          placeholder="when..."
+          onChange={(e) => actions.updateEdgeLabel(edgeRef, e.target.value)}
+        />
+      ) : (
+        <input
+          id="insp-edge-label"
+          className={inputCls}
+          value={label ?? ""}
+          placeholder="optional label..."
+          onChange={(e) => actions.updateEdgeLabel(edgeRef, e.target.value)}
+        />
+      )}
 
       <span className={labelCls}>Line</span>
       <div className="flex gap-1">
