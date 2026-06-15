@@ -946,6 +946,7 @@ export function Editor({ initial }: Props) {
       <div className="relative min-h-0 flex-1">
         <Canvas
           doc={doc}
+          actorColorScope={fileDoc.views}
           positions={positions}
           selection={selection}
           connectFrom={connectFrom}
@@ -960,7 +961,12 @@ export function Editor({ initial }: Props) {
           onCancelConnect={() => setConnectFrom(null)}
           onMenu={(target, x, y) => setMenu({ target, x, y })}
         />
-        <Inspector doc={doc} selection={selection} actions={actions} />
+        <Inspector
+          doc={doc}
+          actorColorScope={fileDoc.views}
+          selection={selection}
+          actions={actions}
+        />
         {menu && (
           <ContextMenu
             menu={menu}

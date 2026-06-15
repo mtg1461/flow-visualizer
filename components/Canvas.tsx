@@ -35,6 +35,7 @@ import { NodeTile } from "./NodeTile";
 
 interface Props {
   doc: Explanation;
+  actorColorScope: readonly Explanation[];
   positions: Map<string, Pos>;
   selection: Selection | null;
   connectFrom: string | null;
@@ -81,6 +82,7 @@ const markerId = (color: string) => `tip-c-${color.replace(/[^a-zA-Z0-9]/g, "")}
 
 export function Canvas({
   doc,
+  actorColorScope,
   positions,
   selection,
   connectFrom,
@@ -132,7 +134,10 @@ export function Canvas({
     moved: boolean;
   } | null>(null);
 
-  const colors = useMemo(() => actorColors(doc), [doc]);
+  const colors = useMemo(
+    () => actorColors(doc, actorColorScope),
+    [doc, actorColorScope]
+  );
   const groupColorMap = useMemo(() => groupColors(doc), [doc]);
   const actorsById = useMemo(
     () => new Map((doc.actors ?? []).map((p) => [p.id, p])),

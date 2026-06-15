@@ -48,6 +48,7 @@ export interface EditorActions {
 
 interface Props {
   doc: Explanation;
+  actorColorScope: readonly Explanation[];
   selection: Selection | null;
   actions: EditorActions;
 }
@@ -64,7 +65,7 @@ function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
 }
 
-export function Inspector({ doc, selection, actions }: Props) {
+export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
   const panelKey = selection
     ? selection.kind === "edge"
       ? `${selection.kind}:${JSON.stringify(selection.ref)}`
@@ -89,7 +90,11 @@ export function Inspector({ doc, selection, actions }: Props) {
             actions={actions}
           />
         ) : (
-          <DocPanel doc={doc} actions={actions} />
+          <DocPanel
+            doc={doc}
+            actorColorScope={actorColorScope}
+            actions={actions}
+          />
         )}
       </div>
     </aside>
@@ -563,12 +568,14 @@ function GroupPanel({
 
 function DocPanel({
   doc,
+  actorColorScope,
   actions,
 }: {
   doc: Explanation;
+  actorColorScope: readonly Explanation[];
   actions: EditorActions;
 }) {
-  const colors = actorColors(doc);
+  const colors = actorColors(doc, actorColorScope);
   const groupColorMap = groupColors(doc);
   const actors = doc.actors ?? [];
   const groups = doc.groups ?? [];
