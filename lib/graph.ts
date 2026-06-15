@@ -149,12 +149,73 @@ export interface RoutedEdge extends EdgeDesc {
  * materialized into `then` on load and stripped again on export.
  */
 export function normalize<T extends Explanation>(doc: T): T {
-  const steps = doc.steps.map((s, i) => {
+  const pairKey = (from: string, to: string) => `${from}\u0000${to}`;
+  const branchPairs = new Set<string>();
+  const flowPairs = new Map<string, number>();
+  let changed = false;
+
+  let steps = doc.steps.map((s, i) => {
     const next = doc.steps[i + 1];
-    if (!s.branches?.length && !s.then && next) return { ...s, then: next.id };
+    if (!s.branches?.length && !s.then && next) {
+      changed = true;
+      return { ...s, then: next.id };
+    }
     return s;
   });
-  return { ...doc, steps };
+
+  steps = steps.map((s, i) => {
+    let step = s;
+    if (s.branches?.length) {
+      const seenTargets = new Set<string>();
+      const branches = s.branches.filter((b) => {
+        const key = pairKey(s.id, b.to);
+        if (seenTargets.has(b.to) || branchPairs.has(key)) {
+          changed = true;
+          return false;
+        }
+        seenTargets.add(b.to);
+        branchPairs.add(key);
+        return true;
+      });
+      if (branches.length !== s.branches.length) {
+        step = { ...step, branches: branches.length ? branches : undefined };
+      }
+      if (step.then) {
+        const {
+          then: _then,
+          thenLabel: _thenLabel,
+          thenColor: _thenColor,
+          thenLine: _thenLine,
+          ...rest
+        } = step;
+        step = rest;
+        changed = true;
+      }
+    }
+
+    if (step.then) flowPairs.set(pairKey(step.id, step.then), i);
+    return step;
+  });
+
+  const loops = doc.loops?.filter((loop) => {
+    const key = pairKey(loop.from, loop.to);
+    const flowIndex = flowPairs.get(key);
+    if (flowIndex !== undefined) {
+      if (loop.label && !steps[flowIndex].thenLabel) {
+        steps[flowIndex] = { ...steps[flowIndex], thenLabel: loop.label };
+      }
+      changed = true;
+      return false;
+    }
+    if (branchPairs.has(key)) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+
+  if (loops && doc.loops && loops.length !== doc.loops.length) changed = true;
+  return changed ? { ...doc, steps, loops: loops?.length ? loops : undefined } : doc;
 }
 
 export function denormalize<T extends Explanation>(doc: T): T {

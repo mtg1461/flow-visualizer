@@ -41,7 +41,7 @@ export interface Step {
   branches?: Branch[];
   /** Explicit next step when flow does not continue to the following step. */
   then?: string;
-  /** Optional label on the outgoing flow edge. Tool-managed. */
+  /** Optional short label on the outgoing flow edge. */
   thenLabel?: string;
   /** Custom color for the outgoing flow edge. Tool-managed. */
   thenColor?: string;

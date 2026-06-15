@@ -18,7 +18,8 @@ Use this JSON shape (output valid JSON only — no comments, no trailing commas)
           "kind": "trigger | input | process | decision | output | wait",
           "actor": "actor-id",
           "branches": [{ "when": "minimal condition", "to": "step-id" }],
-          "then": "step-id"
+          "then": "step-id",
+          "thenLabel": "optional minimal transition label"
         }
       ],
       "loops": [{ "from": "step-id", "to": "step-id", "label": "what feeds back" }],
@@ -32,8 +33,10 @@ How to model it well:
 - Use multiple views only when the subject has distinct perspectives that would be crowded in one chart, such as request lifecycle, data model, and background jobs.
 - Keep view titles and summaries concise: titles should be short names, and summaries should be one short sentence.
 - Steps flow to the next listed step automatically — omit "then" for plain sequence. Set "then" only to jump elsewhere: skip ahead, merge two paths into one step, or loop back.
+- Each source/target pair should have exactly one connection. Do not describe the same edge twice with both step order/"then" and a branch or loop. If a normal step-to-step transition truly needs a label, use "then" plus a short "thenLabel"; never add a "loop" just to label a forward transition. Most normal transitions should have no label.
 - Make decisions real forks: "kind": "decision" with 2-3 mutually exclusive "branches", each leading to a DIFFERENT step so the paths actually diverge. Keep each branch "when" condition minimal, ideally 1-4 words, not a sentence. Let those paths run a few steps, then rejoin with a shared "then" if they merge. A step that always continues to one place is a process, not a decision.
-- Use "loops" (or a backward "then"/branch) only for genuine feedback — a later outcome that revises earlier state. One or two is normal; do not wire a loop from every step.
+- Do not put "then" on a decision step that already has "branches"; the branches are its outgoing connections.
+- Use "loops" (or a backward "then"/branch) only for genuine feedback — a later outcome that revises earlier state. Loops should point back to earlier steps, not forward through the main sequence. One or two is normal; do not wire a loop from every step.
 - "trigger" is the event that starts or wakes the flow; use it for the first external cause. "input" is data or material entering an already-started flow, "output" is the result, and "wait" pauses for an external event; everything else is "process". Give each step the actor that performs it.
 - Cluster related steps into "groups" by phase or subsystem when two or more belong together.
 - Keep each view tight and honest: roughly 6-14 steps, stable lowercase unique ids, every referenced id present, no orphan steps.
