@@ -15,6 +15,7 @@ import { LOCAL_FILES_ENABLED } from "@/lib/config";
  *  Path connections only exist when LOCAL_FILES_ENABLED, so this is inert
  *  on a hosted build. Browser-handle connections aren't restorable here. */
 export const LAST_PATH_KEY = "flow-visualizer:lastPath";
+const SAVE_DEBOUNCE_MS = 1500;
 
 /** Starter document written when the user creates a new empty flow file. */
 const EMPTY_FLOW: FlowFile = {
@@ -212,6 +213,7 @@ export function useFileConnection({
     useState<BrowserFileConnection | null>(null);
   const [status, setStatus] = useState<FileSyncStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   // demo mode: the canvas is open on the built-in example with no file bound,
   // so nothing saves back to disk and nothing is polled.
   const [exampleMode, setExampleMode] = useState(false);
@@ -364,6 +366,7 @@ export function useFileConnection({
         });
         setBrowserFile(null);
         setExampleMode(false);
+        setLastSavedAt(null);
         rememberPath(data.path);
         commit(next, undefined, false);
         onConnected(viewIdFor(next));
@@ -419,6 +422,7 @@ export function useFileConnection({
         lastFileJson.current = serializeDoc(next);
         setBoundFile(null);
         setExampleMode(false);
+        setLastSavedAt(null);
         setBrowserFile({
           name: handle.name || file.name || "flow.json",
           lastModified: file.lastModified,
@@ -611,12 +615,14 @@ export function useFileConnection({
         });
         setBrowserFile(null);
         setExampleMode(false);
+        setLastSavedAt(null);
         rememberPath(pendingConnection.path);
       } else if (pendingConnection.kind === "browser") {
         if (pendingConnection.saveAccess !== "ready")
           await requestBrowserWrite(pendingConnection.handle);
         setBoundFile(null);
         setExampleMode(false);
+        setLastSavedAt(null);
         setBrowserFile({
           name: pendingConnection.sourceName,
           lastModified: pendingConnection.lastModified,
@@ -627,6 +633,7 @@ export function useFileConnection({
         setBoundFile(null);
         setBrowserFile(null);
         setExampleMode(true);
+        setLastSavedAt(null);
         forgetPath();
       }
       setPendingConnection(null);
@@ -697,6 +704,7 @@ export function useFileConnection({
           throw new Error("This connection cannot write back. Paste a local path instead.");
         }
         lastFileJson.current = contents;
+        setLastSavedAt(Date.now());
         setError(null);
         settleStatus("saved");
       } catch (saveError) {
@@ -705,7 +713,7 @@ export function useFileConnection({
         );
         setStatus("error");
       }
-    }, 700);
+    }, SAVE_DEBOUNCE_MS);
     return () => {
       if (saveTimer.current) {
         window.clearTimeout(saveTimer.current);
@@ -801,6 +809,7 @@ export function useFileConnection({
     setBoundFile(null);
     setBrowserFile(null);
     setExampleMode(false);
+    setLastSavedAt(null);
     setStatus("idle");
     setError(null);
     setPendingConnection(null);
@@ -812,6 +821,7 @@ export function useFileConnection({
     path,
     status,
     error,
+    lastSavedAt,
     preview,
     connected,
     connectionName,

@@ -970,6 +970,7 @@ export function Editor({ initial }: Props) {
         activeViewId={activeViewId}
         connectionName={fileConnection.connectionName}
         status={fileConnection.status}
+        lastSavedAt={fileConnection.lastSavedAt}
         canUndo={canUndo}
         onUndo={undo}
         onAddStep={() => addStep()}

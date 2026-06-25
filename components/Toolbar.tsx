@@ -27,6 +27,7 @@ interface Props {
   activeViewId: string;
   connectionName: string;
   status: FileSyncStatus;
+  lastSavedAt: number | null;
   canUndo: boolean;
   onUndo: () => void;
   onAddStep: () => void;
@@ -44,6 +45,7 @@ export function Toolbar({
   activeViewId,
   connectionName,
   status,
+  lastSavedAt,
   canUndo,
   onUndo,
   onAddStep,
@@ -58,19 +60,31 @@ export function Toolbar({
   const [open, setOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
   const activeView = views.find((view) => view.id === activeViewId) ?? views[0];
-  const active = status === "watching" || status === "saved";
+  const connected =
+    status === "watching" || status === "saving" || status === "saved";
   const statusLabel =
     status === "example"
       ? "Example"
-      : status === "saving"
-        ? "Saving"
-        : status === "external"
+      : status === "external"
           ? "Reloaded"
           : status === "error"
             ? "Issue"
-            : active
+            : connected
               ? "Connected"
               : "Connecting";
+  const autoSaveLabel =
+    status === "example"
+      ? "Example not saved"
+      : status === "saving"
+        ? "Saving..."
+        : lastSavedAt
+          ? `Auto saved ${new Date(lastSavedAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}`
+          : status === "error"
+            ? "Save issue"
+            : "Auto save ready";
 
   useEffect(() => {
     if (!open) return;
@@ -172,9 +186,7 @@ export function Toolbar({
           className={`h-2 w-2 shrink-0 rounded-full ${
             status === "error"
               ? "bg-rose"
-              : status === "saving"
-                ? "bg-amber"
-                : status === "example"
+              : status === "example"
                   ? "bg-accent"
                   : "bg-teal"
           }`}
@@ -194,6 +206,12 @@ export function Toolbar({
         <Unplug size={12} />
         Disconnect
       </button>
+      <span
+        className="hidden shrink-0 text-[11px] font-medium text-faint lg:inline"
+        title={lastSavedAt ? new Date(lastSavedAt).toLocaleString() : undefined}
+      >
+        {autoSaveLabel}
+      </span>
       <span className="flex-1" />
       <ThemeSwitcher />
       <button

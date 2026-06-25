@@ -77,14 +77,14 @@ export function NodeTile({
             : ", 0 12px 34px var(--app-node-shadow)"
         }`,
       }}
-      className={`group absolute overflow-hidden select-none rounded-lg border hover:border-line-strong ${
+      className={`group absolute select-none rounded-lg border hover:border-line-strong ${
         dragging
           ? "z-20 scale-[1.015] transition-none"
           : "transition-[left,top,border-color,box-shadow,transform,opacity] duration-200 ease-out hover:-translate-y-0.5"
       } ${connectTarget ? "cursor-crosshair" : "cursor-pointer"}`}
     >
       <div
-        className="flex items-center gap-1.5 px-3.5 pb-1.5 pt-2.5"
+        className="flex items-center gap-1.5 rounded-t-[7px] px-3.5 pb-1.5 pt-2.5"
         style={{
           background: `linear-gradient(180deg, ${withAlpha(
             accent,
