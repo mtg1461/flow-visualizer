@@ -21,6 +21,7 @@ export const SAMPLE: FlowFile = {
             "One or two sentences of intent. Everything downstream is the agent translating this into working code.",
           kind: "trigger",
           actor: "user",
+          then: "explore",
         },
         {
           id: "explore",
@@ -29,6 +30,7 @@ export const SAMPLE: FlowFile = {
             "Search, open files, follow imports. The goal is a mental model: where the change belongs and what it might break.",
           kind: "process",
           actor: "agent",
+          then: "plan",
         },
         {
           id: "plan",
@@ -37,6 +39,7 @@ export const SAMPLE: FlowFile = {
             "Which files to touch, in what order, and what could go wrong. Cheap to fix here, expensive to fix later.",
           kind: "process",
           actor: "agent",
+          then: "edit",
         },
         {
           id: "edit",
@@ -45,6 +48,7 @@ export const SAMPLE: FlowFile = {
             "The plan turns into edits. Small, reviewable changes that match the style of the code around them.",
           kind: "process",
           actor: "agent",
+          then: "test",
         },
         {
           id: "test",
@@ -53,6 +57,7 @@ export const SAMPLE: FlowFile = {
             "Compile, lint, unit tests. The machine gets the first vote on whether the change is real progress.",
           kind: "process",
           actor: "tests",
+          then: "verdict",
         },
         {
           id: "verdict",

@@ -316,21 +316,22 @@ export function Editor({ initial }: Props) {
   );
 
   const addStep = useCallback(
-    (opts?: { afterId?: string; cell?: Pos }) => {
+    (opts?: { afterId?: string; cell?: Pos; connectAfter?: boolean }) => {
       const d = docRef.current;
       let n = d.steps.length + 1;
       while (d.steps.some((s) => s.id === `step-${n}`)) n++;
       const id = `step-${n}`;
 
-      const afterId =
-        opts?.afterId ??
-        (opts?.cell ? null : selection?.kind === "step" ? selection.id : null);
+      const afterId = opts?.afterId ?? null;
+      const connectAfter = !!afterId && opts?.connectAfter === true;
       let cell: Pos;
       if (opts?.cell) {
         cell = nearestFreeCell(positions, opts.cell.col, opts.cell.row);
       } else {
-        const anchor = afterId
-          ? positions.get(afterId)
+        const anchorId =
+          afterId ?? (selection?.kind === "step" ? selection.id : null);
+        const anchor = anchorId
+          ? positions.get(anchorId)
           : [...positions.values()].reduce<Pos | null>(
               (acc, p) => (!acc || p.row > acc.row ? p : acc),
               null
@@ -344,13 +345,14 @@ export function Editor({ initial }: Props) {
 
       const newStep: Step = { id, title: "New step", kind: "process", grid: cell };
       let steps: Step[];
-      if (afterId) {
-        // insert into the flow after the anchor step
+      if (afterId && connectAfter) {
+        // Explicit "Add step after" connects and splices into the flow.
         const i = d.steps.findIndex((s) => s.id === afterId);
+        if (i < 0) return;
         const sel = d.steps[i];
         const inherited = !sel.branches?.length ? sel.then : undefined;
         steps = [...d.steps];
-        steps[i] = inherited ? { ...sel, then: id } : sel;
+        steps[i] = !sel.branches?.length ? { ...sel, then: id } : sel;
         steps.splice(
           i + 1,
           0,
@@ -1069,7 +1071,7 @@ export function Editor({ initial }: Props) {
             }
             canDelete={doc.steps.length > 1}
             onClose={() => setMenu(null)}
-            onAddAfter={(id) => addStep({ afterId: id })}
+            onAddAfter={(id) => addStep({ afterId: id, connectAfter: true })}
             onAddAt={(cell) => addStep({ cell })}
             onAddGroupAt={addGroupAt}
             onConnect={(id) => setConnectFrom(id)}

@@ -28,6 +28,7 @@
           "detail": "Enter an absolute or project-relative JSON path in the File dialog.",
           "kind": "trigger",
           "actor": "visualizer",
+          "then": "read-json",
           "grid": {
             "col": 0,
             "row": 0
@@ -39,6 +40,7 @@
           "detail": "A local Next API route reads the file and returns its contents and modified time.",
           "kind": "process",
           "actor": "visualizer",
+          "then": "render-graph",
           "grid": {
             "col": 0,
             "row": 1
@@ -50,6 +52,7 @@
           "detail": "The parser validates the file and the active view becomes the canvas state.",
           "kind": "process",
           "actor": "visualizer",
+          "then": "watch-file",
           "grid": {
             "col": 0,
             "row": 2
@@ -61,6 +64,7 @@
           "detail": "The browser polls the file timestamp and reloads when another agent updates it.",
           "kind": "process",
           "actor": "file",
+          "then": "edit-canvas",
           "grid": {
             "col": 0,
             "row": 3
@@ -72,6 +76,7 @@
           "detail": "Move tiles, rename actors, adjust groups, or change edge labels directly in the app.",
           "kind": "process",
           "actor": "visualizer",
+          "then": "write-back",
           "grid": {
             "col": 0,
             "row": 4

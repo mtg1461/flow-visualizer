@@ -8,9 +8,8 @@ export function edgeKey(ref: EdgeRef): string {
 }
 
 /**
- * The agent schema lets flow continue implicitly to the following step.
- * The editor needs every connection explicit, so implicit nexts are
- * materialized into `then` on load and stripped again on export.
+ * Connections are explicit. Step array order is only storage/order metadata;
+ * it must never create an edge on load or remove one on export.
  */
 export function normalize<T extends Explanation>(doc: T): T {
   const pairKey = (from: string, to: string) => `${from}\u0000${to}`;
@@ -18,16 +17,7 @@ export function normalize<T extends Explanation>(doc: T): T {
   const flowPairs = new Map<string, number>();
   let changed = false;
 
-  let steps = doc.steps.map((s, i) => {
-    const next = doc.steps[i + 1];
-    if (!s.branches?.length && !s.then && next) {
-      changed = true;
-      return { ...s, then: next.id };
-    }
-    return s;
-  });
-
-  steps = steps.map((s, i) => {
+  const steps = doc.steps.map((s, i) => {
     let step = s;
     if (s.branches?.length) {
       const seenTargets = new Set<string>();
@@ -83,23 +73,7 @@ export function normalize<T extends Explanation>(doc: T): T {
 }
 
 export function denormalize<T extends Explanation>(doc: T): T {
-  const steps = doc.steps.map((s, i) => {
-    const next = doc.steps[i + 1];
-    if (
-      s.then &&
-      next &&
-      s.then === next.id &&
-      !s.branches?.length &&
-      !s.thenLabel &&
-      !s.thenColor &&
-      !s.thenLine
-    ) {
-      const { then: _omitted, ...rest } = s;
-      return rest;
-    }
-    return s;
-  });
-  return { ...doc, steps };
+  return doc;
 }
 
 export function buildEdges(doc: Explanation): EdgeDesc[] {

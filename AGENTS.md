@@ -28,9 +28,9 @@ removed deliberately — do not reintroduce it).
 
 ## Invariants
 
-- **normalize/denormalize**: implicit step-to-step flow is materialized into
-  explicit `then` on load and stripped again on export. The editor only ever
-  deals in explicit edges; exported JSON stays minimal for agents.
+- **Connections are explicit**: step array order never creates an edge.
+  `normalize` may clean invalid duplicate edges, but it must not infer `then`;
+  `denormalize` must not strip explicit connections on export.
 - **All mutations go through `Editor.commit()`** (undo/redo stacks, 1s
   coalescing per key). Never set doc state directly.
 - **Tool-managed fields**: `step.grid`, `group.grid`, edge colors/line

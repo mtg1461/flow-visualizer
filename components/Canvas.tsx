@@ -1120,9 +1120,9 @@ export function Canvas({
       setDrag(null);
       if (!d) return;
       if (!d.moved) {
-        // click, not drag
-        if (connectFrom && connectFrom !== d.id) onCompleteConnect(d.id);
-        else if (connectFrom === d.id) onCancelConnect();
+        // click, not drag. Connections complete only through ports, never
+        // from a plain tile click.
+        if (connectFrom === d.id) onCancelConnect();
         else onSelect({ kind: "step", id: d.id }, d.additive);
       } else if (last) {
         const cell = nearestFreeCell(
@@ -1477,7 +1477,9 @@ export function Canvas({
               onPortClick={() =>
                 connectFrom === step.id
                   ? onCancelConnect()
-                  : onStartConnect(step.id)
+                  : connectFrom
+                    ? onCompleteConnect(step.id)
+                    : onStartConnect(step.id)
               }
             />
           );
@@ -1487,7 +1489,7 @@ export function Canvas({
       {/* connect-mode hint */}
       {connectFrom && (
         <div className="anim-pop material-panel pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/45 px-3.5 py-1.5 text-[12px] font-medium text-teal">
-          Click a tile to connect — Esc to cancel
+          Click another port to connect - Esc to cancel
         </div>
       )}
 

@@ -127,15 +127,17 @@ export function NodeTile({
       {/* connect port */}
       <button
         type="button"
-        title="Connect to another step"
-        aria-label={`Connect from ${step.title}`}
+        title={connectTarget ? "Connect to this step" : "Connect to another step"}
+        aria-label={
+          connectTarget ? `Connect to ${step.title}` : `Connect from ${step.title}`
+        }
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           onPortClick();
         }}
         className={`absolute -bottom-[14px] left-1/2 -translate-x-1/2 cursor-pointer p-1.5 transition-opacity ${
-          selected || connectSource
+          selected || connectSource || connectTarget
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100"
         }`}

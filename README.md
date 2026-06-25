@@ -36,6 +36,9 @@ pause; the watcher also reloads it if the file changes on disk. The **Agent
 Prompt** button hands an agent the JSON contract — try
 [examples/thermostat.json](examples/thermostat.json).
 
+Connections are explicit: step order does not create edges. Use `then`,
+`branches`, or `loops` for every connection that should appear on the canvas.
+
 The file shape is `FlowFile` in [lib/types.ts](lib/types.ts); layout and
 orthogonal routing still operate on one active `FlowView` at a time in
 [lib/graph.ts](lib/graph.ts).
@@ -49,7 +52,7 @@ orthogonal routing still operate on one active `FlowView` at a time in
 - Use the top-left selector to switch flow views.
 - Use the toolbar **Step** and **Group** buttons to add quickly.
 - Right-click the graph to add at a specific spot or open local actions.
-- Click a tile to edit it; click its port, then another tile, to connect.
+- Click a tile to edit it; click its port, then another port, to connect.
 - Use **Trigger** for the event that starts or wakes a flow; trigger tiles
   default to red.
 - Click any edge to restyle it — label, line (solid/dashed/dotted), and color.
