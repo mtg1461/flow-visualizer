@@ -74,7 +74,12 @@ function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
 }
 
-export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
+export function Inspector({
+  doc,
+  actorColorScope,
+  selection,
+  actions,
+}: Props) {
   const { resolvedTheme } = useTheme();
   const panelKey = selection
     ? selection.kind === "edge"
@@ -713,8 +718,12 @@ function DocPanel({
 
   return (
     <div>
-      <label className={`${labelCls} mt-0`} htmlFor="insp-doc-title">
-        Title
+      <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
+        View
+      </span>
+
+      <label className={labelCls} htmlFor="insp-doc-title">
+        View name
       </label>
       <input
         id="insp-doc-title"
@@ -724,7 +733,7 @@ function DocPanel({
       />
 
       <label className={labelCls} htmlFor="insp-summary">
-        Summary
+        View description
       </label>
       <textarea
         id="insp-summary"

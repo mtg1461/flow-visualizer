@@ -6,8 +6,10 @@ import {
   Check,
   ChevronDown,
   GitBranch,
+  Pencil,
   Plus,
   RotateCcw,
+  Trash2,
   Undo2,
   Unplug,
   Wand2,
@@ -33,6 +35,8 @@ interface Props {
   onAddStep: () => void;
   onAddGroup: () => void;
   onAddView: () => void;
+  onEditView: (id: string) => void;
+  onDeleteView: (id: string) => void;
   onViewSelect: (id: string) => void;
   onTidy: () => void;
   onResetLayout: () => void;
@@ -51,6 +55,8 @@ export function Toolbar({
   onAddStep,
   onAddGroup,
   onAddView,
+  onEditView,
+  onDeleteView,
   onViewSelect,
   onTidy,
   onResetLayout,
@@ -66,12 +72,12 @@ export function Toolbar({
     status === "example"
       ? "Example"
       : status === "external"
-          ? "Reloaded"
-          : status === "error"
-            ? "Issue"
-            : connected
-              ? "Connected"
-              : "Connecting";
+        ? "Reloaded"
+        : status === "error"
+          ? "Issue"
+          : connected
+            ? "Connected"
+            : "Connecting";
   const autoSaveLabel =
     status === "example"
       ? "Example not saved"
@@ -114,7 +120,7 @@ export function Toolbar({
         >
           <GitBranch size={13} className="shrink-0 text-accent" />
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-            {activeView?.title ?? "Untitled view"}
+            {activeView?.title || "Untitled view"}
           </span>
           <ChevronDown
             size={13}
@@ -122,7 +128,7 @@ export function Toolbar({
           />
         </button>
         {open && (
-          <div className="anim-pop material-panel absolute left-0 top-10 z-50 w-[340px] rounded-xl border border-line-strong p-1.5">
+          <div className="anim-pop material-panel absolute left-0 top-10 z-50 w-[360px] rounded-xl border border-line-strong p-1.5">
             <div className="mb-1 flex items-center justify-between border-b border-line px-2 py-1.5">
               <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-faint">
                 Views
@@ -144,37 +150,76 @@ export function Toolbar({
               {views.map((view) => {
                 const selected = view.id === activeViewId;
                 return (
-                  <button
+                  <div
                     key={view.id}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onViewSelect(view.id);
-                      setOpen(false);
-                    }}
-                    className={`flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-[background-color,color,transform] duration-150 hover:-translate-y-px ${
+                    className={`rounded-lg transition-[background-color,color,box-shadow] duration-150 ${
                       selected
                         ? "bg-accent/20 text-text shadow-[inset_0_0_0_1px_rgba(155,155,255,0.16)]"
                         : "text-mute hover:bg-well hover:text-text"
                     }`}
                   >
-                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-accent">
-                      {selected ? <Check size={13} /> : <GitBranch size={13} />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12.5px] font-medium">
-                        {view.title}
-                      </span>
-                      {view.summary && (
-                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-faint">
-                          {view.summary}
+                    <div className="flex items-start gap-2 px-2.5 py-2">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          onViewSelect(view.id);
+                          setOpen(false);
+                        }}
+                        className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-left transition-transform duration-150 hover:-translate-y-px"
+                      >
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-accent">
+                          {selected ? (
+                            <Check size={13} />
+                          ) : (
+                            <GitBranch size={13} />
+                          )}
                         </span>
-                      )}
-                      <span className="mt-1 block text-[10.5px] uppercase tracking-[0.12em] text-faint">
-                        {view.stepCount} steps
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12.5px] font-medium">
+                            {view.title || "Untitled view"}
+                          </span>
+                          {view.summary && (
+                            <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-faint">
+                              {view.summary}
+                            </span>
+                          )}
+                          <span className="mt-1 block text-[10.5px] uppercase tracking-[0.12em] text-faint">
+                            {view.stepCount} steps
+                          </span>
+                        </span>
+                      </button>
+                      <span className="mt-0.5 flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          title={`Edit ${view.title || "view"}`}
+                          aria-label={`Edit ${view.title || "view"}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onEditView(view.id);
+                            setOpen(false);
+                          }}
+                          className="flex size-6 cursor-pointer items-center justify-center rounded-md border border-line text-faint transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px hover:border-accent/45 hover:text-accent active:translate-y-0"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          title={`Delete ${view.title || "view"}`}
+                          aria-label={`Delete ${view.title || "view"}`}
+                          disabled={views.length <= 1}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteView(view.id);
+                            setOpen(false);
+                          }}
+                          className="flex size-6 cursor-pointer items-center justify-center rounded-md border border-line text-faint transition-[background-color,border-color,color,opacity,transform] duration-150 hover:-translate-y-px hover:border-rose/45 hover:bg-rose/10 hover:text-rose active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-35"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </span>
-                    </span>
-                  </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -187,8 +232,8 @@ export function Toolbar({
             status === "error"
               ? "bg-rose"
               : status === "example"
-                  ? "bg-accent"
-                  : "bg-teal"
+                ? "bg-accent"
+                : "bg-teal"
           }`}
         />
         <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-faint">

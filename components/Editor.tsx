@@ -28,6 +28,8 @@ import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
 import { ConnectionScreen } from "./ConnectionScreen";
 import { DisconnectDialog } from "./DisconnectDialog";
+import { DeleteViewDialog } from "./DeleteViewDialog";
+import { EditViewDialog } from "./EditViewDialog";
 import { ResetLayoutDialog } from "./ResetLayoutDialog";
 import { AgentPromptDialog } from "./AgentPromptDialog";
 import { HowItWorksDialog } from "./HowItWorksDialog";
@@ -79,6 +81,8 @@ export function Editor({ initial }: Props) {
   const [agentPromptOpen, setAgentPromptOpen] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [editViewId, setEditViewId] = useState<string | null>(null);
+  const [deleteViewId, setDeleteViewId] = useState<string | null>(null);
   const [resetLayoutOpen, setResetLayoutOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [fitSignal, setFitSignal] = useState(0);
@@ -227,6 +231,44 @@ export function Editor({ initial }: Props) {
     setConnectFrom(null);
     setMenu(null);
     setFitSignal((s) => s + 1);
+  }, [commitFile, fileRef]);
+
+  const updateView = useCallback(
+    (
+      id: string,
+      patch: Partial<Pick<FlowView, "title" | "summary">>
+    ) => {
+      const currentFile = fileRef.current;
+      commitFile(
+        {
+          ...currentFile,
+          views: currentFile.views.map((view) =>
+            view.id === id ? { ...view, ...patch } : view
+          ),
+        },
+        `view:${id}:${Object.keys(patch).sort().join(",")}`,
+        false
+      );
+    },
+    [commitFile, fileRef]
+  );
+
+  const deleteView = useCallback((id: string) => {
+    const currentFile = fileRef.current;
+    if (currentFile.views.length <= 1) return;
+    const index = currentFile.views.findIndex((view) => view.id === id);
+    if (index < 0) return;
+    const views = currentFile.views.filter((view) => view.id !== id);
+    const nextView = views[Math.min(index, views.length - 1)] ?? views[0];
+    commitFile({ ...currentFile, views }, undefined, false);
+    if (activeViewIdRef.current === id) {
+      activeViewIdRef.current = nextView.id;
+      setActiveViewId(nextView.id);
+      setSelection(null);
+      setConnectFrom(null);
+      setMenu(null);
+      setFitSignal((s) => s + 1);
+    }
   }, [commitFile, fileRef]);
 
   /* ------------------------------------------------------- mutations */
@@ -976,6 +1018,8 @@ export function Editor({ initial }: Props) {
         onAddStep={() => addStep()}
         onAddGroup={addGroupFromToolbar}
         onAddView={addView}
+        onEditView={setEditViewId}
+        onDeleteView={setDeleteViewId}
         onViewSelect={switchView}
         onTidy={tidy}
         onResetLayout={() => setResetLayoutOpen(true)}
@@ -1049,6 +1093,38 @@ export function Editor({ initial }: Props) {
         onConfirm={() => {
           setResetLayoutOpen(false);
           resetLayout();
+        }}
+      />
+      <EditViewDialog
+        open={!!editViewId}
+        viewTitle={
+          fileDoc.views.find((view) => view.id === editViewId)?.title ?? ""
+        }
+        viewSummary={
+          fileDoc.views.find((view) => view.id === editViewId)?.summary
+        }
+        onCancel={() => setEditViewId(null)}
+        onSave={(patch) => {
+          const id = editViewId;
+          setEditViewId(null);
+          if (id) updateView(id, patch);
+        }}
+      />
+      <DeleteViewDialog
+        open={!!deleteViewId}
+        viewTitle={
+          fileDoc.views.find((view) => view.id === deleteViewId)?.title ??
+          "Untitled view"
+        }
+        stepCount={
+          fileDoc.views.find((view) => view.id === deleteViewId)?.steps.length ??
+          0
+        }
+        onCancel={() => setDeleteViewId(null)}
+        onConfirm={() => {
+          const id = deleteViewId;
+          setDeleteViewId(null);
+          if (id) deleteView(id);
         }}
       />
       <AgentPromptDialog
