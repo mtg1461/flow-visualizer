@@ -715,7 +715,81 @@ export function routeEdges(
 
   const edges = buildEdges(doc).filter((e) => pos.has(e.from) && pos.has(e.to));
 
-  // bottom fan: only descending edges actually leave through the bottom
+  // Descending fanout uses geometry, not declaration order: a target left of
+  // the source gets a left bottom port, aligned targets get center, and right
+  // targets get right. Incoming top ports mirror the source position.
+  const descending = edges.filter((e) => P(e.to).row > P(e.from).row);
+  type PortSide = "left" | "center" | "right";
+  const portFractions = (side: PortSide, count: number) => {
+    if (count <= 1) {
+      if (side === "left") return [0.25];
+      if (side === "right") return [0.75];
+      return [0.5];
+    }
+    const range =
+      side === "left"
+        ? [0.18, 0.38]
+        : side === "right"
+          ? [0.62, 0.82]
+          : [0.44, 0.56];
+    return Array.from(
+      { length: count },
+      (_, i) => range[0] + ((range[1] - range[0]) * i) / (count - 1)
+    );
+  };
+  const sourcePortX = new Map<string, number>();
+  const targetPortX = new Map<string, number>();
+  const sideByCol = (fromCol: number, toCol: number): PortSide =>
+    toCol < fromCol ? "left" : toCol > fromCol ? "right" : "center";
+  const sortByNode = (a: EdgeDesc, b: EdgeDesc, nodeOf: (e: EdgeDesc) => string) => {
+    const A = P(nodeOf(a));
+    const B = P(nodeOf(b));
+    return (
+      A.col - B.col ||
+      A.row - B.row ||
+      A.x - B.x ||
+      a.key.localeCompare(b.key)
+    );
+  };
+
+  const outgoing = new Map<string, EdgeDesc[]>();
+  for (const e of descending) {
+    const arr = outgoing.get(e.from) ?? [];
+    arr.push(e);
+    outgoing.set(e.from, arr);
+  }
+  for (const [from, arr] of outgoing) {
+    const A = P(from);
+    for (const side of ["left", "center", "right"] as const) {
+      const bucket = arr
+        .filter((e) => sideByCol(A.col, P(e.to).col) === side)
+        .sort((a, b) => sortByNode(a, b, (e) => e.to));
+      const fractions = portFractions(side, bucket.length);
+      bucket.forEach((e, i) =>
+        sourcePortX.set(e.key, A.x + NODE_W * fractions[i])
+      );
+    }
+  }
+
+  const incoming = new Map<string, EdgeDesc[]>();
+  for (const e of descending) {
+    const arr = incoming.get(e.to) ?? [];
+    arr.push(e);
+    incoming.set(e.to, arr);
+  }
+  for (const [to, arr] of incoming) {
+    const B = P(to);
+    for (const side of ["left", "center", "right"] as const) {
+      const bucket = arr
+        .filter((e) => sideByCol(B.col, P(e.from).col) === side)
+        .sort((a, b) => sortByNode(a, b, (e) => e.from));
+      const fractions = portFractions(side, bucket.length);
+      bucket.forEach((e, i) =>
+        targetPortX.set(e.key, B.x + NODE_W * fractions[i])
+      );
+    }
+  }
+
   const outOrder = new Map<string, EdgeDesc[]>();
   for (const e of edges) {
     if (P(e.to).row <= P(e.from).row) continue;
@@ -791,6 +865,7 @@ export function routeEdges(
     const oi = outs.findIndex((o) => o.key === e.key);
     const on = outs.length;
     const outX =
+      sourcePortX.get(e.key) ??
       A.x + NODE_W / 2 + (oi >= 0 && on > 1 ? (oi - (on - 1) / 2) * 20 : 0);
 
     let pts: Pt[];
@@ -898,10 +973,10 @@ export function routeEdges(
       const gIdx = gutterCount.get(A.row) ?? 0;
       gutterCount.set(A.row, gIdx + 1);
       const gy = (A.row + 1) * CELL_H + (gIdx % 4) * 12 - 18;
-      const bTop = { x: B.x + NODE_W / 2, y: B.y };
+      const bTop = { x: targetPortX.get(e.key) ?? B.x + NODE_W / 2, y: B.y };
       if (
         A.col === B.col &&
-        outX === A.x + NODE_W / 2 &&
+        Math.abs(outX - bTop.x) < 0.5 &&
         colClear(A.col, A.row + 1, B.row - 1)
       ) {
         pts = [{ x: outX, y: A.y + NODE_H }, bTop];

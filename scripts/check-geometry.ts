@@ -222,6 +222,50 @@ function checkView(source: string, view: Explanation) {
   }
 }
 
+function pathStartX(d: string) {
+  const match = d.match(/^M\s+(-?\d+(?:\.\d+)?)/);
+  assert(match, `Could not read path start from "${d}"`);
+  return Number(match[1]);
+}
+
+function assertPositionAwareFanout() {
+  const doc: Explanation = {
+    title: "Position-aware fanout",
+    steps: [
+      {
+        id: "source",
+        title: "Source",
+        kind: "decision",
+        grid: { col: 0, row: 0 },
+        branches: [
+          { when: "right", to: "right" },
+          { when: "left", to: "left" },
+          { when: "center", to: "center" },
+        ],
+      },
+      { id: "left", title: "Left", grid: { col: -1, row: 1 } },
+      { id: "center", title: "Center", grid: { col: 0, row: 1 } },
+      { id: "right", title: "Right", grid: { col: 1, row: 1 } },
+    ],
+  };
+  const pos = assertPositions(doc);
+  const source = pos.get("source");
+  assert(source, "fanout source has no position");
+  const sourceCenter = source.col * CELL_W + GX + NODE_W / 2;
+  const byTarget = new Map(
+    routeEdges(doc, pos).map((edge) => [edge.to, pathStartX(edge.d)])
+  );
+  const left = byTarget.get("left");
+  const center = byTarget.get("center");
+  const right = byTarget.get("right");
+  assert(left !== undefined, "fanout left edge was not routed");
+  assert(center !== undefined, "fanout center edge was not routed");
+  assert(right !== undefined, "fanout right edge was not routed");
+  assert(left < center && center < right, "fanout ports are not ordered by target position");
+  assert(Math.abs(center - sourceCenter) < 1, "center fanout did not use the center port");
+  console.log("position-aware fanout: ok");
+}
+
 const fixtures: { source: string; file: FlowFile }[] = [
   { source: "lib/sample.ts", file: SAMPLE },
   ...examples.map((source) => ({ source, file: loadExample(source) })),
@@ -230,5 +274,7 @@ const fixtures: { source: string; file: FlowFile }[] = [
 for (const fixture of fixtures) {
   for (const view of fixture.file.views) checkView(fixture.source, view);
 }
+
+assertPositionAwareFanout();
 
 console.log(`Geometry checks passed for ${fixtures.reduce((sum, fixture) => sum + fixture.file.views.length, 0)} views.`);
