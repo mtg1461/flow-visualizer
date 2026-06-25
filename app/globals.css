@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0b0c12;
-  --color-surface: #181a25;
-  --color-raise: #20222f;
-  --color-tile: #2a2c3e;
-  --color-well: #0e0f16;
-  --color-line: rgba(255, 255, 255, 0.12);
-  --color-line-strong: rgba(255, 255, 255, 0.22);
+  --color-bg: #07080d;
+  --color-surface: #141724;
+  --color-raise: #1d2130;
+  --color-tile: #292d3f;
+  --color-well: #0a0c13;
+  --color-line: rgba(255, 255, 255, 0.14);
+  --color-line-strong: rgba(255, 255, 255, 0.26);
   --color-text: #f4f4f9;
   --color-mute: #b4b6c6;
   --color-faint: #8d8fa1;
@@ -98,6 +98,64 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+.app-shell {
+  background:
+    linear-gradient(180deg, rgba(20, 23, 36, 0.72), rgba(7, 8, 13, 0) 220px),
+    linear-gradient(135deg, #080911 0%, #0d111d 42%, #07080d 100%);
+}
+
+.canvas-stage {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 20%),
+    linear-gradient(135deg, #080911 0%, #0b0f19 48%, #07080d 100%);
+}
+
+.canvas-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  opacity: 0.38;
+  mask-image: linear-gradient(180deg, black, transparent 88%);
+}
+
+.material-panel {
+  background:
+    linear-gradient(180deg, rgba(37, 41, 58, 0.98), rgba(22, 25, 38, 0.98)),
+    var(--color-raise);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+.material-bar {
+  background:
+    linear-gradient(180deg, rgba(35, 39, 56, 0.96), rgba(17, 20, 31, 0.96)),
+    var(--color-raise);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 12px 32px rgba(0, 0, 0, 0.42);
+}
+
+.material-control {
+  background:
+    linear-gradient(180deg, rgba(48, 52, 72, 0.95), rgba(30, 34, 50, 0.95)),
+    var(--color-raise);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+.material-control:hover {
+  background:
+    linear-gradient(180deg, rgba(58, 63, 86, 0.98), rgba(36, 40, 58, 0.98)),
+    var(--color-tile);
 }
 
 ::selection {

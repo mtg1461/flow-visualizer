@@ -28,8 +28,8 @@ export default function Home() {
 
   if (!initial) {
     return (
-      <main className="flex h-dvh items-center justify-center bg-bg p-5">
-        <div className="rounded-xl border border-line-strong bg-raise px-4 py-3 text-[12.5px] text-mute">
+      <main className="app-shell flex h-dvh items-center justify-center p-5">
+        <div className="material-panel rounded-xl border border-line-strong px-4 py-3 text-[12.5px] text-mute">
           Loading Flow Visualizer...
         </div>
       </main>

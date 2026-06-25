@@ -103,8 +103,8 @@ export function ConnectionScreen({
   }
 
   return (
-    <main className="flex h-dvh items-center justify-center bg-bg p-5">
-      <section className="anim-pop w-full max-w-[720px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
+    <main className="app-shell flex h-dvh items-center justify-center p-5">
+      <section className="anim-pop material-panel w-full max-w-[720px] rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <FlowMark size={52} className="shrink-0" />
@@ -118,7 +118,7 @@ export function ConnectionScreen({
           <button
             type="button"
             onClick={onAgentPrompt}
-            className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
+            className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/20 px-3 text-[12.5px] font-semibold text-accent shadow-[0_0_18px_rgba(155,155,255,0.12)] transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-accent/75 hover:bg-accent/30 active:translate-y-0"
           >
             <Bot size={13} />
             Agent Prompt
@@ -134,7 +134,7 @@ export function ConnectionScreen({
               type="button"
               onClick={onBrowse}
               disabled={busy}
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile disabled:cursor-not-allowed disabled:opacity-50"
+              className="material-control flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[12.5px] text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FolderOpen size={13} />
               Browse
@@ -142,7 +142,7 @@ export function ConnectionScreen({
             <button
               type="button"
               onClick={onHowItWorks}
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[12.5px] text-text/90 transition-colors hover:bg-tile"
+              className="material-control flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong px-3 text-[12.5px] text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0"
             >
               <Workflow size={13} />
               How it works
@@ -160,7 +160,7 @@ export function ConnectionScreen({
           className={`mt-5 flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed px-5 text-center transition-colors ${
             over
               ? "border-accent bg-accent/10"
-              : "border-line-strong bg-surface"
+              : "border-line-strong bg-black/20"
           }`}
         >
           <Upload size={20} className="text-accent" />
@@ -184,7 +184,7 @@ export function ConnectionScreen({
           type="button"
           onClick={onCreateEmpty}
           disabled={busy}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-3 text-[13px] font-medium text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+          className="material-control flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line-strong px-4 py-3 text-[13px] font-semibold text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <FilePlus2 size={15} />
           Create empty flow

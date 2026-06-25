@@ -1116,7 +1116,7 @@ export function Canvas({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onContextMenu={onContextMenu}
-      className={`anim-canvas relative h-full w-full overflow-hidden ${
+      className={`anim-canvas canvas-stage relative h-full w-full overflow-hidden ${
         marquee
           ? "cursor-crosshair"
           : panRef.current?.moved
@@ -1141,9 +1141,9 @@ export function Canvas({
             top: GRID_LIMITS.minRow * CELL_H,
             width: (GRID_LIMITS.maxCol - GRID_LIMITS.minCol + 1) * CELL_W,
             height: (GRID_LIMITS.maxRow - GRID_LIMITS.minRow + 1) * CELL_H,
-            opacity: drag || multiDrag || marquee ? 1 : 0.6,
+            opacity: drag || multiDrag || marquee ? 1 : 0.66,
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
-              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
+              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='rgba(255,255,255,0.012)' stroke='rgba(255,255,255,0.26)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
             )}")`,
             backgroundSize: `${CELL_W}px ${CELL_H}px`,
           }}
@@ -1173,12 +1173,12 @@ export function Canvas({
                   ? "rgba(239,156,190,0.12)"
                   : withAlpha(r.color, "2e"),
                 boxShadow: isSel
-                  ? `0 0 0 3px ${withAlpha(r.color, "47")}`
-                  : undefined,
+                  ? `0 0 0 3px ${withAlpha(r.color, "47")}, 0 18px 46px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.08)`
+                  : "inset 0 1px 0 rgba(255,255,255,0.07), 0 12px 34px rgba(0,0,0,0.18)",
               }}
             >
               <span
-                className="absolute left-2.5 top-2 flex items-center gap-1 rounded-md py-0.5 pl-1 pr-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                className="absolute left-2.5 top-2 flex items-center gap-1 rounded-md border border-white/10 py-0.5 pl-1 pr-2 text-[11px] font-bold uppercase tracking-[0.16em] shadow-md shadow-black/25"
                 style={{
                   color: r.color,
                   background: withAlpha(r.color, "47"),
@@ -1377,7 +1377,7 @@ export function Canvas({
                   e.stopPropagation();
                   onSelect({ kind: "edge", ref: edge.ref });
                 }}
-                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise px-2 py-0.5 text-[11px] leading-4 shadow-md shadow-black/40 transition-[left,top,border-color,color,box-shadow,opacity] duration-200 ease-out ${tone} ${
+                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise/95 px-2 py-0.5 text-[11px] font-medium leading-4 shadow-lg shadow-black/50 backdrop-blur-sm transition-[left,top,border-color,color,box-shadow,opacity] duration-200 ease-out ${tone} ${
                   isSel ? "ring-1 ring-accent/60" : ""
                 }`}
                 style={{
@@ -1438,19 +1438,19 @@ export function Canvas({
 
       {/* connect-mode hint */}
       {connectFrom && (
-        <div className="anim-pop pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/40 bg-raise px-3.5 py-1.5 text-[12px] text-teal shadow-lg shadow-black/30">
+        <div className="anim-pop material-panel pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/45 px-3.5 py-1.5 text-[12px] font-medium text-teal shadow-lg shadow-black/40">
           Click a tile to connect — Esc to cancel
         </div>
       )}
 
       {/* zoom controls */}
-      <div className="anim-pop absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-line-strong bg-raise p-1 shadow-lg shadow-black/30">
+      <div className="anim-pop material-panel absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-white/20 p-1 shadow-lg shadow-black/45">
         <button
           type="button"
           aria-label="Zoom out"
           onClick={() => zoomBy(1 / 1.25)}
           onPointerDown={(e) => e.stopPropagation()}
-          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-line hover:text-text"
+          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-white/10 hover:text-text"
         >
           <Minus size={13} />
         </button>
@@ -1462,7 +1462,7 @@ export function Canvas({
           aria-label="Zoom in"
           onClick={() => zoomBy(1.25)}
           onPointerDown={(e) => e.stopPropagation()}
-          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-line hover:text-text"
+          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-white/10 hover:text-text"
         >
           <Plus size={13} />
         </button>
@@ -1474,14 +1474,14 @@ export function Canvas({
             fit();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-line hover:text-text"
+          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-white/10 hover:text-text"
         >
           <Maximize2 size={13} />
         </button>
       </div>
 
       {/* hint */}
-      <div className="pointer-events-none absolute bottom-5 left-4 hidden text-[11.5px] text-mute md:block">
+      <div className="pointer-events-none absolute bottom-5 left-4 hidden rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[11.5px] font-medium text-mute shadow-lg shadow-black/30 backdrop-blur-sm md:block">
         Right-click the graph for more options
       </div>
     </div>

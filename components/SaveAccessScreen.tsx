@@ -23,13 +23,13 @@ export function SaveAccessScreen({
   const busy = status === "loading";
 
   return (
-    <main className="flex h-dvh items-center justify-center bg-bg p-5">
-      <section className="anim-pop w-full max-w-[620px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
+    <main className="app-shell flex h-dvh items-center justify-center p-5">
+      <section className="anim-pop material-panel w-full max-w-[620px] rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClear}
-            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-colors hover:border-line-strong hover:text-text"
+            className="material-control flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-line-strong hover:text-text active:translate-y-0"
           >
             <ArrowLeft size={13} />
             Choose another
@@ -37,7 +37,7 @@ export function SaveAccessScreen({
           <button
             type="button"
             onClick={onAgentPrompt}
-            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
+            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/20 px-3 text-[12.5px] font-semibold text-accent shadow-[0_0_18px_rgba(155,155,255,0.12)] transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-accent/75 hover:bg-accent/30 active:translate-y-0"
           >
             <Bot size={13} />
             Agent Prompt
@@ -60,7 +60,7 @@ export function SaveAccessScreen({
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl border border-line bg-well p-3">
+        <div className="mt-6 rounded-xl border border-white/15 bg-black/20 p-3 shadow-inner shadow-white/5">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[12.5px] text-mute">
               {preview.views.length} view{preview.views.length === 1 ? "" : "s"} found

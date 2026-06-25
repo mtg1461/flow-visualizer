@@ -88,14 +88,14 @@ export function Toolbar({
   }, [open]);
 
   return (
-    <header className="anim-toolbar z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line-strong bg-surface px-3.5">
+    <header className="anim-toolbar material-bar z-40 flex h-12 shrink-0 items-center gap-3 border-b border-white/15 px-3.5 backdrop-blur-md">
       <div ref={switcherRef} className="relative">
         <button
           type="button"
           title="Switch flow view"
           aria-label="Switch flow view"
           onClick={() => setOpen((value) => !value)}
-          className="flex h-8 min-w-[220px] max-w-[320px] cursor-pointer items-center gap-2 rounded-lg border border-accent/35 bg-accent/15 px-2.5 text-left text-text transition-colors hover:bg-accent/25"
+          className="flex h-8 min-w-[220px] max-w-[320px] cursor-pointer items-center gap-2 rounded-lg border border-accent/55 bg-accent/20 px-2.5 text-left text-text shadow-[0_0_22px_rgba(155,155,255,0.13)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent/80 hover:bg-accent/30 hover:shadow-[0_0_28px_rgba(155,155,255,0.22)] active:translate-y-0"
         >
           <GitBranch size={13} className="shrink-0 text-accent" />
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
@@ -107,7 +107,7 @@ export function Toolbar({
           />
         </button>
         {open && (
-          <div className="anim-pop absolute left-0 top-10 z-50 w-[340px] rounded-xl border border-line-strong bg-raise p-1.5 shadow-2xl shadow-black/45">
+          <div className="anim-pop material-panel absolute left-0 top-10 z-50 w-[340px] rounded-xl border border-line-strong p-1.5 shadow-2xl shadow-black/55">
             <div className="mb-1 flex items-center justify-between border-b border-line px-2 py-1.5">
               <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-faint">
                 Views
@@ -137,10 +137,10 @@ export function Toolbar({
                       onViewSelect(view.id);
                       setOpen(false);
                     }}
-                    className={`flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                    className={`flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-[background-color,color,transform] duration-150 hover:-translate-y-px ${
                       selected
-                        ? "bg-accent/15 text-text"
-                        : "text-mute hover:bg-line hover:text-text"
+                        ? "bg-accent/20 text-text shadow-[inset_0_0_0_1px_rgba(155,155,255,0.16)]"
+                        : "text-mute hover:bg-white/10 hover:text-text"
                     }`}
                   >
                     <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-accent">
@@ -166,7 +166,7 @@ export function Toolbar({
           </div>
         )}
       </div>
-      <div className="flex min-w-0 max-w-[360px] items-center gap-2 rounded-lg border border-line bg-well px-2.5 py-1.5">
+      <div className="flex min-w-0 max-w-[360px] items-center gap-2 rounded-lg border border-white/15 bg-black/25 px-2.5 py-1.5 shadow-inner shadow-black/35">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
             status === "error"
@@ -188,7 +188,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onDisconnect}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong bg-raise px-2.5 text-[12px] text-text/90 transition-colors hover:bg-tile"
+        className="material-control flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line-strong px-2.5 text-[12px] text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0"
       >
         <Unplug size={12} />
         Disconnect
@@ -200,7 +200,7 @@ export function Toolbar({
         aria-label="Undo"
         onClick={onUndo}
         disabled={!canUndo}
-        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line-strong bg-raise text-text/90 transition-colors hover:bg-tile disabled:cursor-not-allowed disabled:opacity-35"
+        className="material-control flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-line-strong text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-35"
       >
         <Undo2 size={13} />
       </button>
@@ -210,7 +210,7 @@ export function Toolbar({
           title="Add step"
           aria-label="Add step"
           onClick={onAddStep}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-raise text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 md:w-auto md:px-3"
+          className="material-control flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0 md:w-auto md:px-3"
         >
           <Plus size={13} />
           <span className="hidden text-[12.5px] md:inline">Step</span>
@@ -220,7 +220,7 @@ export function Toolbar({
           title="Add group"
           aria-label="Add group"
           onClick={onAddGroup}
-          className="flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-raise text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 md:w-auto md:px-3"
+          className="material-control flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px active:translate-y-0 md:w-auto md:px-3"
         >
           <Plus size={13} />
           <span className="hidden text-[12.5px] md:inline">Group</span>
@@ -239,7 +239,7 @@ export function Toolbar({
         type="button"
         title="Discard saved positions and reflow the active view"
         onClick={onResetLayout}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-amber/55 bg-amber/12 px-3 text-[12.5px] font-medium text-amber transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-amber/75 hover:bg-amber/18 active:translate-y-0"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-amber/65 bg-amber/15 px-3 text-[12.5px] font-semibold text-amber shadow-[0_0_18px_rgba(238,194,122,0.12)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-amber/85 hover:bg-amber/20 hover:shadow-[0_0_22px_rgba(238,194,122,0.2)] active:translate-y-0"
       >
         <RotateCcw size={13} strokeWidth={2.4} />
         Reset
@@ -247,7 +247,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onAgentPrompt}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-accent/25 active:translate-y-0"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/20 px-3 text-[12.5px] font-semibold text-accent shadow-[0_0_18px_rgba(155,155,255,0.12)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent/75 hover:bg-accent/30 hover:shadow-[0_0_22px_rgba(155,155,255,0.2)] active:translate-y-0"
       >
         <Bot size={13} />
         Agent Prompt

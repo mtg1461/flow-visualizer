@@ -34,7 +34,7 @@ interface Props {
 }
 
 const itemCls =
-  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] text-mute transition-colors hover:bg-line hover:text-text";
+  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] text-mute transition-colors hover:bg-white/10 hover:text-text";
 
 export function ContextMenu({
   menu,
@@ -76,7 +76,7 @@ export function ContextMenu({
     <div
       ref={ref}
       role="menu"
-      className="anim-pop fixed z-50 w-[184px] rounded-xl border border-line-strong bg-raise py-1.5 shadow-2xl shadow-black/50"
+      className="anim-pop material-panel fixed z-50 w-[184px] rounded-xl border border-white/20 py-1.5 shadow-2xl shadow-black/55"
       style={{ left: x, top: y, animationDuration: "0.12s" }}
       onContextMenu={(e) => e.preventDefault()}
     >

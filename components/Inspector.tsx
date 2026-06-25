@@ -59,10 +59,10 @@ interface Props {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-line-strong bg-well px-2.5 py-1.5 text-[13px] text-text shadow-inner shadow-black/25 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/70 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/15";
+  "w-full rounded-lg border border-white/20 bg-black/25 px-2.5 py-1.5 text-[13px] text-text shadow-inner shadow-black/35 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/75 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/20";
 const selectCls = `${inputCls} cursor-pointer appearance-none pr-8`;
 const miniInputCls =
-  "rounded-md border border-line-strong bg-well px-1.5 py-1 text-text shadow-inner shadow-black/20 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/70 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/15";
+  "rounded-md border border-white/20 bg-black/25 px-1.5 py-1 text-text shadow-inner shadow-black/30 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/75 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/20";
 const labelCls =
   "mb-1.5 mt-3.5 block text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute";
 
@@ -80,7 +80,7 @@ export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
     : "doc";
 
   return (
-    <aside className="anim-inspector absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-line-strong bg-raise p-4 shadow-2xl shadow-black/40 md:flex">
+    <aside className="anim-inspector material-panel absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-white/20 p-4 shadow-2xl shadow-black/55 backdrop-blur-md md:flex">
       <div key={panelKey} className="anim-panel-change">
         {selection?.kind === "step" ? (
           <StepPanel
@@ -180,7 +180,7 @@ function MultiPanel({
         {steps.slice(0, 5).map((step) => (
           <div
             key={`step:${step.id}`}
-            className="rounded-lg border border-line bg-surface px-2.5 py-2 text-[12px] text-text/85"
+            className="rounded-lg border border-white/15 bg-black/20 px-2.5 py-2 text-[12px] text-text/90 shadow-inner shadow-white/5"
           >
             {truncate(step.title, 32)}
           </div>
@@ -188,7 +188,7 @@ function MultiPanel({
         {groups.slice(0, 4).map((group) => (
           <div
             key={`group:${group.id}`}
-            className="rounded-lg border border-line bg-surface px-2.5 py-2 text-[12px] text-text/85"
+            className="rounded-lg border border-white/15 bg-black/20 px-2.5 py-2 text-[12px] text-text/90 shadow-inner shadow-white/5"
           >
             {truncate(group.label, 32)}
           </div>
@@ -714,7 +714,7 @@ function DocPanel({
         <button
           type="button"
           onClick={() => actions.addActor("New actor")}
-          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2 py-1 text-[11.5px] text-mute transition-colors hover:border-line-strong hover:text-text"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-accent/35 bg-accent/15 px-2 py-1 text-[11.5px] font-medium text-accent transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-accent/60 hover:bg-accent/20 active:translate-y-0"
         >
           <Plus size={11} />
           Add
@@ -724,7 +724,7 @@ function DocPanel({
         {actors.map((p) => (
           <div
             key={p.id}
-            className="rounded-lg border border-line bg-surface p-2"
+            className="rounded-lg border border-white/15 bg-black/20 p-2 shadow-inner shadow-white/5"
           >
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
               <span
@@ -763,7 +763,7 @@ function DocPanel({
           </div>
         ))}
         {actors.length === 0 && (
-          <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[12px] text-faint">
+          <p className="rounded-lg border border-dashed border-line-strong bg-black/15 px-3 py-2 text-[12px] text-faint">
             No actors.
           </p>
         )}
@@ -784,7 +784,7 @@ function DocPanel({
               return (
                 <div
                   key={g.id}
-                  className="rounded-lg border border-line bg-surface p-2.5"
+                  className="rounded-lg border border-white/15 bg-black/20 p-2.5 shadow-inner shadow-white/5"
                 >
                   <div className="flex items-center gap-2">
                     <button

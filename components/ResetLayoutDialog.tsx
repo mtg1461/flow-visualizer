@@ -31,7 +31,7 @@ export function ResetLayoutDialog({
         onClick={onCancel}
         className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
       />
-      <div className="anim-pop relative w-full max-w-[420px] rounded-2xl border border-line-strong bg-raise p-5">
+      <div className="anim-pop material-panel relative w-full max-w-[420px] rounded-2xl border border-white/20 p-5 shadow-2xl shadow-black/55">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber/35 bg-amber/10 text-amber">

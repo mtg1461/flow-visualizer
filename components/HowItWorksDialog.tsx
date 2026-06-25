@@ -77,7 +77,7 @@ export function HowItWorksDialog({ open, onClose, onOpenAgentPrompt }: Props) {
         onClick={onClose}
         className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
       />
-      <div className="anim-pop relative flex max-h-[85dvh] w-full max-w-[560px] flex-col rounded-2xl border border-line-strong bg-raise p-5 shadow-2xl shadow-black/40">
+      <div className="anim-pop material-panel relative flex max-h-[85dvh] w-full max-w-[560px] flex-col rounded-2xl border border-white/20 p-5 shadow-2xl shadow-black/55">
         <div className="flex shrink-0 items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">

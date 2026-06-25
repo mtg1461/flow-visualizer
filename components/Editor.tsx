@@ -966,7 +966,7 @@ export function Editor({ initial }: Props) {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-bg">
+    <div className="app-shell flex h-dvh flex-col overflow-hidden">
       <Toolbar
         views={viewOptions}
         activeViewId={activeViewId}

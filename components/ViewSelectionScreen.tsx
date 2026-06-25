@@ -57,13 +57,13 @@ export function ViewSelectionScreen({
     };
 
   return (
-    <main className="flex h-dvh items-center justify-center bg-bg p-5">
-      <section className="anim-pop w-full max-w-[760px] rounded-2xl border border-line-strong bg-raise p-6 shadow-2xl shadow-black/20">
+    <main className="app-shell flex h-dvh items-center justify-center p-5">
+      <section className="anim-pop material-panel w-full max-w-[760px] rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClear}
-            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-colors hover:border-line-strong hover:text-text"
+            className="material-control flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] text-mute transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-line-strong hover:text-text active:translate-y-0"
           >
             <ArrowLeft size={13} />
             Choose another
@@ -71,7 +71,7 @@ export function ViewSelectionScreen({
           <button
             type="button"
             onClick={onAgentPrompt}
-            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent/25"
+            className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/50 bg-accent/20 px-3 text-[12.5px] font-semibold text-accent shadow-[0_0_18px_rgba(155,155,255,0.12)] transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-accent/75 hover:bg-accent/30 active:translate-y-0"
           >
             <Bot size={13} />
             Agent Prompt
@@ -104,7 +104,7 @@ export function ViewSelectionScreen({
               type="button"
               onClick={choose(view.id)}
               disabled={busy}
-              className={`group min-h-[94px] cursor-pointer rounded-xl border border-line-strong bg-surface p-3 text-left transition-[border-color,background-color,opacity,transform] duration-150 hover:-translate-y-px hover:border-accent/50 hover:bg-tile disabled:cursor-not-allowed ${
+              className={`group min-h-[94px] cursor-pointer rounded-xl border border-line-strong bg-black/20 p-3 text-left shadow-inner shadow-white/5 transition-[border-color,background-color,box-shadow,opacity,transform] duration-150 hover:-translate-y-px hover:border-accent/55 hover:bg-accent/10 hover:shadow-[0_12px_30px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed ${
                 launch?.id === view.id ? "opacity-0" : "opacity-100"
               }`}
             >
@@ -141,7 +141,7 @@ export function ViewSelectionScreen({
       {launch && selected && (
         <div
           aria-hidden
-          className="fixed z-[60] rounded-xl border border-accent/50 bg-raise px-3 py-2 text-left shadow-2xl shadow-black/40"
+          className="material-panel fixed z-[60] rounded-xl border border-accent/50 px-3 py-2 text-left shadow-2xl shadow-black/50"
           style={{
             left: launch.active ? 14 : launch.rect.left,
             top: launch.active ? 8 : launch.rect.top,
