@@ -23,6 +23,24 @@ export async function POST(request: Request) {
       return errorResponse("File is too large to save.", 413);
     JSON.parse(body.contents);
     await mkdir(path.dirname(filePath), { recursive: true });
+    if (!body.force) {
+      const expectedMtimeMs =
+        typeof body.expectedMtimeMs === "number"
+          ? body.expectedMtimeMs
+          : undefined;
+      const expectedSize =
+        typeof body.expectedSize === "number" ? body.expectedSize : undefined;
+      if (expectedMtimeMs !== undefined || expectedSize !== undefined) {
+        const current = await stat(filePath);
+        if (
+          (expectedMtimeMs !== undefined &&
+            Math.abs(current.mtimeMs - expectedMtimeMs) > 1) ||
+          (expectedSize !== undefined && current.size !== expectedSize)
+        ) {
+          return errorResponse("File changed before save completed.", 409);
+        }
+      }
+    }
     await writeFile(
       filePath,
       body.contents.endsWith("\n") ? body.contents : `${body.contents}\n`,

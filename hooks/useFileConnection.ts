@@ -79,6 +79,37 @@ interface BrowserFileConnection {
   handle: BrowserFileHandle;
 }
 
+type FileSnapshot =
+  | {
+      kind: "path";
+      sourceName: string;
+      meta: LocalFileStat;
+      normalized: FlowFile;
+      json: string;
+      updatedAt: number;
+    }
+  | {
+      kind: "browser";
+      sourceName: string;
+      meta: BrowserFileConnection;
+      normalized: FlowFile;
+      json: string;
+      updatedAt: number;
+    };
+
+interface SyncConflict {
+  sourceName: string;
+  detectedAt: number;
+  externalUpdatedAt: number;
+  snapshot: FileSnapshot;
+}
+
+export interface FileConflictPreview {
+  sourceName: string;
+  detectedAt: number;
+  externalUpdatedAt: number;
+}
+
 type PendingConnection =
   | (LocalFileRead & {
       kind: "path";
@@ -145,7 +176,13 @@ function serializeDoc(file: FlowFile) {
 
 async function postFileApi<T>(
   endpoint: "read" | "stat" | "write",
-  body: { path: string; contents?: string }
+  body: {
+    path: string;
+    contents?: string;
+    expectedMtimeMs?: number;
+    expectedSize?: number;
+    force?: boolean;
+  }
 ): Promise<T> {
   const response = await fetch(`/api/file/${endpoint}`, {
     method: "POST",
@@ -155,10 +192,23 @@ async function postFileApi<T>(
   });
   const data = await response.json();
   if (!response.ok)
-    throw new Error(
-      typeof data?.error === "string" ? data.error : "File operation failed."
+    throw Object.assign(
+      new Error(
+        typeof data?.error === "string" ? data.error : "File operation failed."
+      ),
+      { status: response.status }
     );
   return data as T;
+}
+
+function canonicalizeContents(contents: string) {
+  const result = parseFlowFile(contents);
+  if (!result.ok) throw new Error(result.error);
+  const normalized = prepareFile(result.data);
+  return {
+    normalized,
+    json: serializeDoc(normalized),
+  };
 }
 
 function isBrowserFileHandle(handle: unknown): handle is BrowserFileHandle {
@@ -214,13 +264,17 @@ export function useFileConnection({
   const [status, setStatus] = useState<FileSyncStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [conflict, setConflict] = useState<SyncConflict | null>(null);
   // demo mode: the canvas is open on the built-in example with no file bound,
   // so nothing saves back to disk and nothing is polled.
   const [exampleMode, setExampleMode] = useState(false);
 
+  const fileRef = useRef(file);
   const lastFileJson = useRef(serializeDoc(file));
   const saveTimer = useRef<number | null>(null);
   const readingFile = useRef(false);
+
+  fileRef.current = file;
 
   const connected = !!boundFile || !!browserFile || exampleMode;
   const connectionName =
@@ -255,6 +309,116 @@ export function useFileConnection({
         ? activeViewId
         : next.views[0].id,
     [activeViewId]
+  );
+
+  const readPathSnapshot = useCallback(
+    async (filePath: string): Promise<FileSnapshot> => {
+      const data = await postFileApi<LocalFileRead>("read", { path: filePath });
+      const canonical = canonicalizeContents(data.contents);
+      return {
+        kind: "path",
+        sourceName: data.path,
+        meta: {
+          path: data.path,
+          mtimeMs: data.mtimeMs,
+          size: data.size,
+        },
+        normalized: canonical.normalized,
+        json: canonical.json,
+        updatedAt: data.mtimeMs,
+      };
+    },
+    []
+  );
+
+  const readBrowserSnapshot = useCallback(
+    async (connection: {
+      name: string;
+      handle: BrowserFileHandle;
+    }): Promise<FileSnapshot> => {
+      const file = await connection.handle.getFile();
+      const canonical = canonicalizeContents(await file.text());
+      const meta: BrowserFileConnection = {
+        name: connection.name || file.name || "flow.json",
+        lastModified: file.lastModified,
+        size: file.size,
+        handle: connection.handle,
+      };
+      return {
+        kind: "browser",
+        sourceName: meta.name,
+        meta,
+        normalized: canonical.normalized,
+        json: canonical.json,
+        updatedAt: file.lastModified,
+      };
+    },
+    []
+  );
+
+  const updateConnectionFromSnapshot = useCallback((snapshot: FileSnapshot) => {
+    if (snapshot.kind === "path") {
+      setBoundFile(snapshot.meta);
+    } else {
+      setBrowserFile(snapshot.meta);
+    }
+  }, []);
+
+  const applySnapshot = useCallback(
+    (snapshot: FileSnapshot, source: "manual" | "watch" = "watch") => {
+      readingFile.current = true;
+      lastFileJson.current = snapshot.json;
+      setConflict(null);
+      if (snapshot.kind === "path") {
+        setPathState(snapshot.meta.path);
+        setBoundFile(snapshot.meta);
+        setBrowserFile(null);
+        rememberPath(snapshot.meta.path);
+      } else {
+        setPathState("");
+        setBoundFile(null);
+        setBrowserFile(snapshot.meta);
+      }
+      setExampleMode(false);
+      setLastSavedAt(null);
+      commit(snapshot.normalized, undefined, false);
+      onConnected(viewIdFor(snapshot.normalized));
+      settleStatus(source === "watch" ? "external" : "watching");
+      window.setTimeout(() => {
+        readingFile.current = false;
+      }, 0);
+    },
+    [commit, onConnected, settleStatus, viewIdFor]
+  );
+
+  const openConflict = useCallback((snapshot: FileSnapshot) => {
+    setConflict({
+      sourceName: snapshot.sourceName,
+      detectedAt: Date.now(),
+      externalUpdatedAt: snapshot.updatedAt,
+      snapshot,
+    });
+    setError(null);
+    setStatus("conflict");
+  }, []);
+
+  const handleExternalSnapshot = useCallback(
+    (snapshot: FileSnapshot): "unchanged" | "reloaded" | "conflict" => {
+      if (snapshot.json === lastFileJson.current) {
+        updateConnectionFromSnapshot(snapshot);
+        return "unchanged";
+      }
+
+      const currentJson = serializeDoc(fileRef.current);
+      if (currentJson === lastFileJson.current) {
+        applySnapshot(snapshot, "watch");
+        return "reloaded";
+      }
+
+      openConflict(snapshot);
+      return "conflict";
+    },
+    [applySnapshot, openConflict, updateConnectionFromSnapshot]
   );
 
   const previewPath = useCallback(async (nextPath: string) => {
@@ -341,50 +505,6 @@ export function useFileConnection({
     return () => window.clearTimeout(id);
   }, [connected, path, previewPath]);
 
-  const loadPath = useCallback(
-    async (nextPath = path, source: "manual" | "watch" = "manual") => {
-      const wanted = nextPath.trim();
-      if (!wanted) {
-        setError("Enter a local JSON file path.");
-        setStatus("error");
-        return;
-      }
-      readingFile.current = true;
-      setError(null);
-      setStatus(source === "watch" ? "external" : "loading");
-      try {
-        const data = await postFileApi<LocalFileRead>("read", { path: wanted });
-        const result = parseFlowFile(data.contents);
-        if (!result.ok) throw new Error(result.error);
-        const next = prepareFile(result.data);
-        lastFileJson.current = serializeDoc(next);
-        setPathState(data.path);
-        setBoundFile({
-          path: data.path,
-          mtimeMs: data.mtimeMs,
-          size: data.size,
-        });
-        setBrowserFile(null);
-        setExampleMode(false);
-        setLastSavedAt(null);
-        rememberPath(data.path);
-        commit(next, undefined, false);
-        onConnected(viewIdFor(next));
-        settleStatus(source === "watch" ? "external" : "watching");
-      } catch (loadError) {
-        setError(
-          loadError instanceof Error ? loadError.message : "Could not open file."
-        );
-        setStatus("error");
-      } finally {
-        window.setTimeout(() => {
-          readingFile.current = false;
-        }, 0);
-      }
-    },
-    [commit, onConnected, path, settleStatus, viewIdFor]
-  );
-
   // Re-offer the last disk path after a refresh. The user still chooses which
   // view to open, so reconnect follows the same selector path as fresh opens.
   const triedReconnect = useRef(false);
@@ -400,51 +520,6 @@ export function useFileConnection({
     if (saved) setPathState(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const connectBrowserHandle = useCallback(
-    async (
-      handle: BrowserFileHandle,
-      source: "manual" | "watch" = "manual"
-    ) => {
-      if (handle.kind && handle.kind !== "file") {
-        setError("Drop or browse to a JSON file.");
-        setStatus("error");
-        return;
-      }
-      readingFile.current = true;
-      setError(null);
-      setStatus(source === "watch" ? "external" : "loading");
-      try {
-        const file = await handle.getFile();
-        const result = parseFlowFile(await file.text());
-        if (!result.ok) throw new Error(result.error);
-        const next = prepareFile(result.data);
-        lastFileJson.current = serializeDoc(next);
-        setBoundFile(null);
-        setExampleMode(false);
-        setLastSavedAt(null);
-        setBrowserFile({
-          name: handle.name || file.name || "flow.json",
-          lastModified: file.lastModified,
-          size: file.size,
-          handle,
-        });
-        commit(next, undefined, false);
-        onConnected(viewIdFor(next));
-        settleStatus(source === "watch" ? "external" : "watching");
-      } catch (loadError) {
-        setError(
-          loadError instanceof Error ? loadError.message : "Could not open file."
-        );
-        setStatus("error");
-      } finally {
-        window.setTimeout(() => {
-          readingFile.current = false;
-        }, 0);
-      }
-    },
-    [commit, onConnected, settleStatus, viewIdFor]
-  );
 
   const browseFile = useCallback(async () => {
     if (!window.showOpenFilePicker) {
@@ -637,6 +712,7 @@ export function useFileConnection({
         forgetPath();
       }
       setPendingConnection(null);
+      setConflict(null);
       commit(next, undefined, false);
       onConnected(nextViewId);
       settleStatus(pendingConnection.kind === "example" ? "example" : "watching");
@@ -676,7 +752,7 @@ export function useFileConnection({
   }, []);
 
   useEffect(() => {
-    if ((!boundFile && !browserFile) || readingFile.current) return;
+    if ((!boundFile && !browserFile) || readingFile.current || conflict) return;
     const contents = serializeDoc(file);
     if (contents === lastFileJson.current) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -684,10 +760,24 @@ export function useFileConnection({
     saveTimer.current = window.setTimeout(async () => {
       saveTimer.current = null;
       try {
+        const snapshot = boundFile
+          ? await readPathSnapshot(boundFile.path)
+          : browserFile
+            ? await readBrowserSnapshot(browserFile)
+            : null;
+        if (snapshot) {
+          const externalState = handleExternalSnapshot(snapshot);
+          if (externalState !== "unchanged") return;
+        }
+
         if (boundFile) {
+          const expected =
+            snapshot?.kind === "path" ? snapshot.meta : boundFile;
           const data = await postFileApi<LocalFileStat>("write", {
             path: boundFile.path,
             contents,
+            expectedMtimeMs: expected.mtimeMs,
+            expectedSize: expected.size,
           });
           setBoundFile(data);
         } else if (browserFile?.handle.createWritable) {
@@ -708,6 +798,20 @@ export function useFileConnection({
         setError(null);
         settleStatus("saved");
       } catch (saveError) {
+        if (
+          boundFile &&
+          typeof saveError === "object" &&
+          saveError !== null &&
+          (saveError as { status?: number }).status === 409
+        ) {
+          try {
+            const snapshot = await readPathSnapshot(boundFile.path);
+            handleExternalSnapshot(snapshot);
+            return;
+          } catch {
+            // fall through to the original save error below
+          }
+        }
         setError(
           saveError instanceof Error ? saveError.message : "Could not save file."
         );
@@ -720,10 +824,19 @@ export function useFileConnection({
         saveTimer.current = null;
       }
     };
-  }, [boundFile, browserFile, file, settleStatus]);
+  }, [
+    boundFile,
+    browserFile,
+    conflict,
+    file,
+    handleExternalSnapshot,
+    readBrowserSnapshot,
+    readPathSnapshot,
+    settleStatus,
+  ]);
 
   useEffect(() => {
-    if (!boundFile) return;
+    if (!boundFile || conflict) return;
     let alive = true;
     const poll = async () => {
       if (readingFile.current || saveTimer.current) return;
@@ -732,8 +845,17 @@ export function useFileConnection({
           path: boundFile.path,
         });
         if (!alive) return;
-        if (Math.abs(data.mtimeMs - boundFile.mtimeMs) > 1) {
-          await loadPath(boundFile.path, "watch");
+        if (
+          Math.abs(data.mtimeMs - boundFile.mtimeMs) > 1 ||
+          data.size !== boundFile.size
+        ) {
+          const snapshot = await readPathSnapshot(boundFile.path);
+          if (!alive) return;
+          const externalState = handleExternalSnapshot(snapshot);
+          if (externalState === "unchanged") {
+            setStatus((s) => (s === "error" ? "watching" : s));
+            setError((e) => (e ? null : e));
+          }
         } else {
           // a clean poll clears a stale transient error (e.g. the dev server
           // was momentarily restarting), so the toolbar leaves "Issue"
@@ -755,18 +877,27 @@ export function useFileConnection({
       alive = false;
       window.clearInterval(id);
     };
-  }, [boundFile, loadPath]);
+  }, [boundFile, conflict, handleExternalSnapshot, readPathSnapshot]);
 
   useEffect(() => {
-    if (!browserFile) return;
+    if (!browserFile || conflict) return;
     let alive = true;
     const poll = async () => {
       if (readingFile.current || saveTimer.current) return;
       try {
         const file = await browserFile.handle.getFile();
         if (!alive) return;
-        if (Math.abs(file.lastModified - browserFile.lastModified) > 1) {
-          await connectBrowserHandle(browserFile.handle, "watch");
+        if (
+          Math.abs(file.lastModified - browserFile.lastModified) > 1 ||
+          file.size !== browserFile.size
+        ) {
+          const snapshot = await readBrowserSnapshot(browserFile);
+          if (!alive) return;
+          const externalState = handleExternalSnapshot(snapshot);
+          if (externalState === "unchanged") {
+            setStatus((s) => (s === "error" ? "watching" : s));
+            setError((e) => (e ? null : e));
+          }
         } else {
           setStatus((s) => (s === "error" ? "watching" : s));
           setError((e) => (e ? null : e));
@@ -786,7 +917,7 @@ export function useFileConnection({
       alive = false;
       window.clearInterval(id);
     };
-  }, [browserFile, connectBrowserHandle]);
+  }, [browserFile, conflict, handleExternalSnapshot, readBrowserSnapshot]);
 
   const setPath = useCallback((nextPath: string) => {
     setPathState(nextPath);
@@ -812,16 +943,71 @@ export function useFileConnection({
     setLastSavedAt(null);
     setStatus("idle");
     setError(null);
+    setConflict(null);
     setPendingConnection(null);
     forgetPath();
     onDisconnected();
   }, [onDisconnected]);
+
+  const keepLocalChanges = useCallback(async () => {
+    if (!conflict) return;
+    const contents = serializeDoc(fileRef.current);
+    setError(null);
+    setStatus("saving");
+    try {
+      if (conflict.snapshot.kind === "path") {
+        const data = await postFileApi<LocalFileStat>("write", {
+          path: conflict.snapshot.meta.path,
+          contents,
+          force: true,
+        });
+        setPathState(data.path);
+        setBoundFile(data);
+        setBrowserFile(null);
+        rememberPath(data.path);
+      } else if (conflict.snapshot.meta.handle.createWritable) {
+        const writable = await conflict.snapshot.meta.handle.createWritable();
+        await writable.write(contents.endsWith("\n") ? contents : `${contents}\n`);
+        await writable.close();
+        const file = await conflict.snapshot.meta.handle.getFile();
+        setBoundFile(null);
+        setBrowserFile({
+          ...conflict.snapshot.meta,
+          lastModified: file.lastModified,
+          size: file.size,
+        });
+      } else {
+        throw new Error("This connection cannot write back. Paste a local path instead.");
+      }
+      lastFileJson.current = contents;
+      setConflict(null);
+      setLastSavedAt(Date.now());
+      settleStatus("saved");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Could not save file."
+      );
+      setStatus("error");
+    }
+  }, [conflict, settleStatus]);
+
+  const reloadExternalChanges = useCallback(() => {
+    if (!conflict) return;
+    applySnapshot(conflict.snapshot, "watch");
+  }, [applySnapshot, conflict]);
 
   return {
     path,
     status,
     error,
     lastSavedAt,
+    conflict: conflict
+      ? {
+          sourceName: conflict.sourceName,
+          detectedAt: conflict.detectedAt,
+          externalUpdatedAt: conflict.externalUpdatedAt,
+        }
+      : null,
     preview,
     connected,
     connectionName,
@@ -834,5 +1020,7 @@ export function useFileConnection({
     connectPending,
     loadExample,
     disconnect,
+    keepLocalChanges,
+    reloadExternalChanges,
   };
 }

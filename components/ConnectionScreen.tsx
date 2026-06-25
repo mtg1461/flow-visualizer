@@ -21,6 +21,7 @@ export type FileSyncStatus =
   | "saving"
   | "saved"
   | "external"
+  | "conflict"
   | "error"
   | "example";
 

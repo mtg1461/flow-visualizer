@@ -30,6 +30,7 @@ import { ConnectionScreen } from "./ConnectionScreen";
 import { DisconnectDialog } from "./DisconnectDialog";
 import { DeleteViewDialog } from "./DeleteViewDialog";
 import { EditViewDialog } from "./EditViewDialog";
+import { FileConflictDialog } from "./FileConflictDialog";
 import { ResetLayoutDialog } from "./ResetLayoutDialog";
 import { AgentPromptDialog } from "./AgentPromptDialog";
 import { HowItWorksDialog } from "./HowItWorksDialog";
@@ -1126,6 +1127,20 @@ export function Editor({ initial }: Props) {
           setDeleteViewId(null);
           if (id) deleteView(id);
         }}
+      />
+      <FileConflictDialog
+        open={!!fileConnection.conflict}
+        sourceName={fileConnection.conflict?.sourceName ?? ""}
+        detectedAt={fileConnection.conflict?.detectedAt ?? Date.now()}
+        externalUpdatedAt={
+          fileConnection.conflict?.externalUpdatedAt ?? Date.now()
+        }
+        busy={
+          fileConnection.status === "saving" ||
+          fileConnection.status === "loading"
+        }
+        onKeepLocal={fileConnection.keepLocalChanges}
+        onReloadExternal={fileConnection.reloadExternalChanges}
       />
       <AgentPromptDialog
         open={agentPromptOpen}

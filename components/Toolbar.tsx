@@ -73,7 +73,9 @@ export function Toolbar({
       ? "Example"
       : status === "external"
         ? "Reloaded"
-        : status === "error"
+        : status === "conflict"
+          ? "Conflict"
+          : status === "error"
           ? "Issue"
           : connected
             ? "Connected"
@@ -83,6 +85,8 @@ export function Toolbar({
       ? "Example not saved"
       : status === "saving"
         ? "Saving..."
+        : status === "conflict"
+          ? "Autosave paused"
         : lastSavedAt
           ? `Auto saved ${new Date(lastSavedAt).toLocaleTimeString([], {
               hour: "numeric",
@@ -231,6 +235,8 @@ export function Toolbar({
           className={`h-2 w-2 shrink-0 rounded-full ${
             status === "error"
               ? "bg-rose"
+              : status === "conflict"
+                ? "bg-amber"
               : status === "example"
                 ? "bg-accent"
                 : "bg-teal"
