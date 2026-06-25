@@ -287,6 +287,120 @@ export function buildEdges(doc: Explanation): EdgeDesc[] {
   return out;
 }
 
+function average(values: number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function centeredInteger(value: number): number {
+  return value < 0 ? Math.ceil(value) : Math.floor(value);
+}
+
+function desiredColumnsByLayer(
+  steps: Explanation["steps"],
+  preds: Map<string, string[]>,
+  succs: Map<string, string[]>,
+  rowOf: Map<string, number>,
+  pinned: Set<string>
+): Map<string, number> {
+  const indexOf = new Map(steps.map((s, i) => [s.id, i]));
+  const rows = new Map<number, string[]>();
+
+  for (const s of steps) {
+    if (pinned.has(s.id)) continue;
+    const row = rowOf.get(s.id);
+    if (row === undefined) continue;
+    const ids = rows.get(row) ?? [];
+    ids.push(s.id);
+    rows.set(row, ids);
+  }
+
+  const rowNumbers = [...rows.keys()].sort((a, b) => a - b);
+  if (rowNumbers.length === 0) return new Map();
+
+  for (const ids of rows.values()) {
+    ids.sort((a, b) => (indexOf.get(a) ?? 0) - (indexOf.get(b) ?? 0));
+  }
+
+  const orderMap = () => {
+    const order = new Map<string, number>();
+    for (const ids of rows.values()) {
+      ids.forEach((id, i) => order.set(id, i));
+    }
+    return order;
+  };
+
+  const neighborAverage = (
+    id: string,
+    neighbors: string[] | undefined,
+    order: Map<string, number>
+  ) => {
+    const values =
+      neighbors
+        ?.map((neighbor) => order.get(neighbor))
+        .filter((value): value is number => value !== undefined) ?? [];
+    return values.length ? average(values) : null;
+  };
+
+  const stableSort = (
+    ids: string[],
+    scoreOf: (id: string) => number | null
+  ) => {
+    const previous = new Map(ids.map((id, i) => [id, i]));
+    ids.sort((a, b) => {
+      const av = scoreOf(a);
+      const bv = scoreOf(b);
+      if (av !== null && bv !== null && av !== bv) return av - bv;
+      if (av !== null && bv === null) return -1;
+      if (av === null && bv !== null) return 1;
+      return (
+        (previous.get(a) ?? 0) - (previous.get(b) ?? 0) ||
+        (indexOf.get(a) ?? 0) - (indexOf.get(b) ?? 0)
+      );
+    });
+  };
+
+  for (let pass = 0; pass < 4; pass++) {
+    let order = orderMap();
+    for (const row of rowNumbers) {
+      const ids = rows.get(row);
+      if (!ids || ids.length < 2) continue;
+      stableSort(ids, (id) => neighborAverage(id, preds.get(id), order));
+    }
+
+    order = orderMap();
+    for (const row of [...rowNumbers].reverse()) {
+      const ids = rows.get(row);
+      if (!ids || ids.length < 2) continue;
+      stableSort(ids, (id) => neighborAverage(id, succs.get(id), order));
+    }
+  }
+
+  const desired = new Map<string, number>();
+  for (const row of rowNumbers) {
+    const ids = rows.get(row) ?? [];
+    const start = -Math.floor((ids.length - 1) / 2);
+    ids.forEach((id, i) => desired.set(id, start + i));
+  }
+
+  // Center branching parents above their child span. Collisions are still
+  // resolved by the normal outward scan, so this only expresses preference.
+  for (const row of [...rowNumbers].reverse()) {
+    for (const id of rows.get(row) ?? []) {
+      const childCols =
+        succs
+          .get(id)
+          ?.map((child) => desired.get(child))
+          .filter((value): value is number => value !== undefined) ?? [];
+      if (childCols.length === 0) continue;
+      if (childCols.length > 1 || (preds.get(id)?.length ?? 0) === 0) {
+        desired.set(id, centeredInteger(average(childCols)));
+      }
+    }
+  }
+
+  return desired;
+}
+
 /**
  * Tile placement. Steps with a manual `grid` keep it; the rest get a
  * layered layout: row = longest forward path, branches fan into
@@ -304,6 +418,7 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
       occupied.add(okey(s.grid.col, s.grid.row));
     }
   }
+  const pinned = new Set(pos.keys());
 
   const fwd = buildEdges(doc).filter((e) => e.kind !== "loop" && !e.backward);
   const preds = new Map<string, string[]>();
@@ -351,6 +466,10 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
     }
     sourceRow += Math.ceil(bucket.ids.length / cols);
   }
+  const sourceCountByRow = new Map<number, number>();
+  for (const slot of sourceSlots.values()) {
+    sourceCountByRow.set(slot.row, (sourceCountByRow.get(slot.row) ?? 0) + 1);
+  }
 
   // Forward edges always point to a later array index, so array order is
   // already topological.
@@ -369,14 +488,23 @@ export function layoutPositions(doc: Explanation): Map<string, Pos> {
     rowOf.set(s.id, r);
   });
 
+  const layeredColumns = desiredColumnsByLayer(steps, preds, succs, rowOf, pinned);
   const offsets = [0, 1, -1, 2, -2, 3, -3];
   steps.forEach((s, i) => {
     if (pos.has(s.id)) return;
     const r = rowOf.get(s.id)!;
     const ps = preds.get(s.id) ?? [];
     const sourceSlot = sourceSlots.get(s.id);
+    const layeredCol = layeredColumns.get(s.id);
+    const hasPinnedPred = ps.some((p) => pinned.has(p));
+    const compactSourceSlot =
+      sourceSlot && (sourceCountByRow.get(sourceSlot.row) ?? 0) > 1;
     let desired = 0;
-    if (sourceSlot) {
+    if (compactSourceSlot) {
+      desired = sourceSlot.col;
+    } else if (layeredCol !== undefined && !hasPinnedPred) {
+      desired = layeredCol;
+    } else if (sourceSlot) {
       desired = sourceSlot.col;
     } else if (ps.length) {
       const primary = ps[0];
@@ -480,6 +608,45 @@ export function tidyLayout<T extends Explanation>(doc: T): T {
   return work;
 }
 
+function pinMissingSteps<T extends Explanation>(doc: T): T {
+  const pos = layoutPositions(doc);
+  let changed = false;
+  const steps = doc.steps.map((s) => {
+    if (s.grid) return s;
+    const p = pos.get(s.id);
+    if (!p) return s;
+    changed = true;
+    return { ...s, grid: { col: p.col, row: p.row } };
+  });
+  return changed ? { ...doc, steps } : doc;
+}
+
+/**
+ * Tidy without throwing away manual layout. Existing step/group grids stay
+ * authoritative; only missing step positions are materialized, then impossible
+ * group conflicts are repaired.
+ */
+export function tidyPreservingLayout<T extends Explanation>(doc: T): T {
+  let work = pinMissingSteps(doc);
+  work = resolveGroupConflicts(work);
+  work = pinMissingSteps(work);
+
+  if (work.groups?.some((g) => g.steps.length > 0 && !g.grid)) {
+    const pos = layoutPositions(work);
+    let changed = false;
+    const groups = work.groups.map((g) => {
+      if (g.grid || g.steps.length === 0) return g;
+      const rect = groupMemberCellRect(g, pos);
+      if (!rect) return g;
+      changed = true;
+      return { ...g, grid: rectToGrid(rect) };
+    });
+    if (changed) work = { ...work, groups };
+  }
+
+  return work;
+}
+
 /**
  * Conflict-resolution passes shared by tidy and file load: separates
  * overlapping groups, evicts non-members from group footprints, and parks
@@ -547,6 +714,7 @@ export function resolveGroupConflicts<T extends Explanation>(work: T): T {
       if (r) rects.set(g.id, r);
     }
     const pins = new Map<string, Pos>();
+    const groupGridPins = new Map<string, NonNullable<Group["grid"]>>();
 
     // 2. separate overlapping member groups
     const placed: CellRect[] = [];
@@ -558,6 +726,13 @@ export function resolveGroupConflicts<T extends Explanation>(work: T): T {
       const next = compactPlacement(r, placed);
       if (next.dCol || next.dRow) {
         separated = true;
+        if (g.grid) {
+          groupGridPins.set(g.id, {
+            ...g.grid,
+            col: g.grid.col + next.dCol,
+            row: g.grid.row + next.dRow,
+          });
+        }
         for (const sid of g.steps) {
           const p = pos.get(sid);
           if (p)
@@ -627,13 +802,19 @@ export function resolveGroupConflicts<T extends Explanation>(work: T): T {
     }
 
     // 4. park colliding empty regions to the right of everything
-    let groupsChanged = false;
-    let newGroups = work.groups;
+    let groupsChanged = groupGridPins.size > 0;
+    let newGroups = groupGridPins.size
+      ? work.groups?.map((g) =>
+          groupGridPins.has(g.id)
+            ? { ...g, grid: groupGridPins.get(g.id)! }
+            : g
+        )
+      : work.groups;
     if (!separated && pins.size === 0) {
       let maxC = 0;
       for (const p of pos.values()) maxC = Math.max(maxC, p.col);
       for (const r of rects.values()) maxC = Math.max(maxC, r.maxC);
-      newGroups = groups.map((g) => {
+      newGroups = (newGroups ?? groups).map((g) => {
         if (g.steps.length > 0 || !g.grid) return g;
         const r = rects.get(g.id);
         if (!r) return g;

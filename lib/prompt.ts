@@ -40,7 +40,7 @@ How to model it well:
 - "trigger" is the event that starts or wakes the flow; use it for the first external cause. "input" is data or material entering an already-started flow, "output" is the result, and "wait" pauses for an external event; everything else is "process". Give each step the actor that performs it.
 - Cluster related steps into "groups" by phase or subsystem when two or more belong together.
 - Keep each view tight and honest: roughly 6-14 steps, stable lowercase unique ids, every referenced id present, no orphan steps.
-- Omit layout and styling fields: step/group "grid", step/group color overrides, and edge color/line overrides. The app and user handle placement and coloring.`;
+- Omit layout and styling fields: step/group "grid", step/group color overrides, and edge color/line overrides. Existing files may contain saved "grid" positions, but agents should not copy or invent them; the app and user handle placement and coloring.`;
 
 export const RECEIVE_RESPONSE_PROMPT = `Explain how the system works as one or more visual flow views. Return only valid JSON — no markdown fences, no prose.
 

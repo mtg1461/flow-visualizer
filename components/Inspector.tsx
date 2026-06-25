@@ -27,6 +27,7 @@ import { type EdgeRef, type Selection } from "@/lib/graph";
 
 export interface EditorActions {
   updateDoc: (patch: Partial<Pick<Explanation, "title" | "summary">>) => void;
+  resetLayout: () => void;
   updateStep: (id: string, patch: Partial<Step>) => void;
   deleteStep: (id: string) => void;
   startConnect: (id: string) => void;
@@ -604,6 +605,20 @@ function DocPanel({
           actions.updateDoc({ summary: e.target.value || undefined })
         }
       />
+
+      <div className="mt-4 border-t border-line pt-3.5">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute">
+          Layout
+        </span>
+        <button
+          type="button"
+          onClick={actions.resetLayout}
+          className="mt-2 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-amber/45 bg-amber/10 px-3 py-2 text-[12px] font-medium text-amber transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-amber/70 hover:bg-amber/15 active:translate-y-0"
+        >
+          <RotateCcw size={12} />
+          Reset layout
+        </button>
+      </div>
 
       <div className="mt-4 flex items-center justify-between">
         <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute">

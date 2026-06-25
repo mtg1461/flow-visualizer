@@ -42,7 +42,10 @@ orthogonal routing still operate on one active `FlowView` at a time in
 
 ## Editing
 
-- Drag tiles to rearrange; **Tidy** re-runs the automatic layout.
+- Drag tiles to rearrange; positions save with the file. **Tidy** preserves
+  saved positions while placing new/unpositioned tiles.
+- Use **Reset layout** in the document inspector to discard saved positions and
+  fully reflow the active view.
 - Use the top-left selector to switch flow views.
 - Use the toolbar **Step** and **Group** buttons to add quickly.
 - Right-click the graph to add at a specific spot or open local actions.

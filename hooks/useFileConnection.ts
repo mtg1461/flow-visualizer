@@ -7,7 +7,7 @@ import { parseFlowFile } from "@/lib/parse";
 import {
   denormalize,
   normalize,
-  tidyLayout,
+  tidyPreservingLayout,
 } from "@/lib/graph";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
 
@@ -129,7 +129,7 @@ function singleDroppedPath(text: string) {
 
 function prepareFile(file: FlowFile): FlowFile {
   return {
-    views: file.views.map((view) => tidyLayout(normalize(view))),
+    views: file.views.map((view) => tidyPreservingLayout(normalize(view))),
   };
 }
 

@@ -14,6 +14,7 @@ import {
   normalize,
   rectsOverlap,
   tidyLayout,
+  tidyPreservingLayout,
   type CellRect,
 } from "@/lib/graph";
 import { Canvas } from "./Canvas";
@@ -22,6 +23,7 @@ import { Inspector, type EditorActions } from "./Inspector";
 import { Toolbar } from "./Toolbar";
 import { ConnectionScreen } from "./ConnectionScreen";
 import { DisconnectDialog } from "./DisconnectDialog";
+import { ResetLayoutDialog } from "./ResetLayoutDialog";
 import { AgentPromptDialog } from "./AgentPromptDialog";
 import { HowItWorksDialog } from "./HowItWorksDialog";
 import { useEditorHistory } from "@/hooks/useEditorHistory";
@@ -107,6 +109,7 @@ export function Editor({ initial }: Props) {
   const [agentPromptOpen, setAgentPromptOpen] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [resetLayoutOpen, setResetLayoutOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [fitSignal, setFitSignal] = useState(0);
   const activeViewIdRef = useRef(activeViewId);
@@ -124,7 +127,9 @@ export function Editor({ initial }: Props) {
   }, []);
 
   const { doc: fileDoc, docRef: fileRef, commit: commitFile, undo, redo, canUndo } = useEditorHistory<FlowFile>({
-    initial: { views: initial.views.map((view) => normalize(view)) },
+    initial: {
+      views: initial.views.map((view) => tidyPreservingLayout(normalize(view))),
+    },
     onRestore,
   });
 
@@ -778,7 +783,15 @@ export function Editor({ initial }: Props) {
 
   const tidy = useCallback(() => {
     const d = docRef.current;
-    // rule 5: Tidy is the explicit re-layout — skip member stabilization
+    const next = tidyPreservingLayout(d);
+    if (JSON.stringify(next) !== JSON.stringify(d))
+      commit(next, undefined, false);
+    setFitSignal((s) => s + 1);
+  }, [commit]);
+
+  const resetLayout = useCallback(() => {
+    const d = docRef.current;
+    // Full reflow intentionally discards saved positions.
     const next = tidyLayout(d);
     if (JSON.stringify(next) !== JSON.stringify(d))
       commit(next, undefined, false);
@@ -792,6 +805,7 @@ export function Editor({ initial }: Props) {
           { ...docRef.current, ...patch },
           `doc:${Object.keys(patch).sort().join(",")}`
         ),
+      resetLayout: () => setResetLayoutOpen(true),
       updateStep,
       deleteStep,
       startConnect: (id) => setConnectFrom(id),
@@ -846,7 +860,14 @@ export function Editor({ initial }: Props) {
         commit({ ...d, groups: groups?.length ? groups : undefined });
       },
     }),
-    [commit, updateStep, deleteStep, deleteEdge, updateEdgeLabel, updateEdgeStyle]
+    [
+      commit,
+      updateStep,
+      deleteStep,
+      deleteEdge,
+      updateEdgeLabel,
+      updateEdgeStyle,
+    ]
   );
 
   /* -------------------------------------------------------- keyboard */
@@ -999,6 +1020,15 @@ export function Editor({ initial }: Props) {
         connectionName={fileConnection.connectionName}
         onCancel={() => setDisconnectOpen(false)}
         onConfirm={fileConnection.disconnect}
+      />
+      <ResetLayoutDialog
+        open={resetLayoutOpen}
+        viewTitle={doc.title}
+        onCancel={() => setResetLayoutOpen(false)}
+        onConfirm={() => {
+          setResetLayoutOpen(false);
+          resetLayout();
+        }}
       />
       <AgentPromptDialog
         open={agentPromptOpen}
