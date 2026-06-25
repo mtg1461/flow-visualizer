@@ -252,17 +252,22 @@ function assertPositionAwareFanout() {
   const source = pos.get("source");
   assert(source, "fanout source has no position");
   const sourceCenter = source.col * CELL_W + GX + NODE_W / 2;
-  const byTarget = new Map(
-    routeEdges(doc, pos).map((edge) => [edge.to, pathStartX(edge.d)])
-  );
-  const left = byTarget.get("left");
-  const center = byTarget.get("center");
-  const right = byTarget.get("right");
-  assert(left !== undefined, "fanout left edge was not routed");
-  assert(center !== undefined, "fanout center edge was not routed");
-  assert(right !== undefined, "fanout right edge was not routed");
+  const byTarget = new Map(routeEdges(doc, pos).map((edge) => [edge.to, edge]));
+  const leftEdge = byTarget.get("left");
+  const centerEdge = byTarget.get("center");
+  const rightEdge = byTarget.get("right");
+  assert(leftEdge !== undefined, "fanout left edge was not routed");
+  assert(centerEdge !== undefined, "fanout center edge was not routed");
+  assert(rightEdge !== undefined, "fanout right edge was not routed");
+  const left = pathStartX(leftEdge.d);
+  const center = pathStartX(centerEdge.d);
+  const right = pathStartX(rightEdge.d);
   assert(left < center && center < right, "fanout ports are not ordered by target position");
   assert(Math.abs(center - sourceCenter) < 1, "center fanout did not use the center port");
+  assert(
+    Math.abs(leftEdge.labelY - rightEdge.labelY) < 1,
+    "fanout gutters staggered even though left and right spans do not overlap"
+  );
   console.log("position-aware fanout: ok");
 }
 

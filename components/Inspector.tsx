@@ -486,11 +486,6 @@ function EdgePanel({
     line = l?.line;
   }
 
-  // the style the edge falls back to when nothing custom is set
-  const backward =
-    edgeRef.type === "loop" ||
-    (byId.get(to)?.i ?? Infinity) <= (byId.get(from)?.i ?? 0);
-  const effectiveLine: EdgeLine = line ?? (backward ? "dashed" : "solid");
   const palette = graphPalette(resolvedTheme);
 
   return (
@@ -546,9 +541,14 @@ function EdgePanel({
           <button
             key={o.value}
             type="button"
-            onClick={() => actions.updateEdgeStyle(edgeRef, { line: o.value })}
+            onClick={() =>
+              actions.updateEdgeStyle(edgeRef, {
+                line: line === o.value ? null : o.value,
+              })
+            }
+            aria-pressed={line === o.value}
             className={`flex-1 cursor-pointer rounded-lg border px-2 py-1.5 text-[11.5px] transition-colors ${
-              effectiveLine === o.value
+              line === o.value
                 ? "border-accent/60 bg-accent/15 text-accent"
                 : "border-line bg-well text-mute hover:border-line-strong hover:text-text"
             }`}
@@ -562,8 +562,8 @@ function EdgePanel({
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          title="Default color"
-          aria-label="Reset to default color"
+          title="No color"
+          aria-label="Use no edge color"
           onClick={() => actions.updateEdgeStyle(edgeRef, { color: null })}
           className={`size-4.5 cursor-pointer rounded-full border border-dashed border-line-strong transition-transform hover:scale-110 ${
             !color ? "ring-1 ring-text/60" : ""
@@ -587,18 +587,6 @@ function EdgePanel({
           />
         ))}
       </div>
-
-      {(line || color) && (
-        <button
-          type="button"
-          onClick={() =>
-            actions.updateEdgeStyle(edgeRef, { line: null, color: null })
-          }
-          className="mt-4 cursor-pointer text-[11.5px] text-faint underline-offset-2 transition-colors hover:text-mute hover:underline"
-        >
-          Reset styling
-        </button>
-      )}
     </div>
   );
 }

@@ -851,7 +851,32 @@ export function routeEdges(
     24 + (lane % 3) * 14 + Math.floor(lane / 3) * CELL_W;
 
   const sideCount = new Map<string, number>();
-  const gutterCount = new Map<number, number>();
+  const gutterLanes = new Map<
+    number,
+    { lane: number; lo: number; hi: number }[]
+  >();
+  const spansOverlap = (aLo: number, aHi: number, bLo: number, bHi: number) =>
+    Math.max(aLo, bLo) < Math.min(aHi, bHi) - 1;
+  const descendingGutterY = (row: number, x1: number, x2: number) => {
+    const lo = Math.min(x1, x2);
+    const hi = Math.max(x1, x2);
+    const spans = gutterLanes.get(row) ?? [];
+    let lane = 0;
+    let bestCollisions = Infinity;
+    for (let i = 0; i < 4; i++) {
+      const collisions = spans.filter(
+        (s) => s.lane === i && spansOverlap(lo, hi, s.lo, s.hi)
+      ).length;
+      if (collisions < bestCollisions) {
+        lane = i;
+        bestCollisions = collisions;
+        if (collisions === 0) break;
+      }
+    }
+    spans.push({ lane, lo, hi });
+    gutterLanes.set(row, spans);
+    return (row + 1) * CELL_H + lane * 12 - 18;
+  };
 
   /** The segment each label sits on, so placement can slide along it. */
   type Seg = { horiz: boolean; lo: number; hi: number };
@@ -970,9 +995,6 @@ export function routeEdges(
     } else {
       // descending — straight drop, gutter run into the top, or a side
       // entry beside the target, whichever clears first
-      const gIdx = gutterCount.get(A.row) ?? 0;
-      gutterCount.set(A.row, gIdx + 1);
-      const gy = (A.row + 1) * CELL_H + (gIdx % 4) * 12 - 18;
       const bTop = { x: targetPortX.get(e.key) ?? B.x + NODE_W / 2, y: B.y };
       if (
         A.col === B.col &&
@@ -984,6 +1006,7 @@ export function routeEdges(
         ly = (A.y + NODE_H + B.y) / 2;
         seg = { horiz: false, lo: A.y + NODE_H, hi: B.y };
       } else if (colClear(B.col, A.row + 1, B.row - 1)) {
+        const gy = descendingGutterY(A.row, outX, bTop.x);
         pts = [
           { x: outX, y: A.y + NODE_H },
           { x: outX, y: gy },
@@ -1009,6 +1032,7 @@ export function routeEdges(
         const chanX = left ? B.x - 18 - sc * 12 : B.x + NODE_W + 18 + sc * 12;
         const enterX = left ? B.x : B.x + NODE_W;
         const by = B.y + NODE_H / 2;
+        const gy = descendingGutterY(A.row, outX, chanX);
         pts = [
           { x: outX, y: A.y + NODE_H },
           { x: outX, y: gy },

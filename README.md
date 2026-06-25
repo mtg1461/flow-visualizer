@@ -55,6 +55,8 @@ orthogonal routing still operate on one active `FlowView` at a time in
 - Click a tile to edit it; click its port, then another port, to connect.
 - Use **Trigger** for the event that starts or wakes a flow; trigger tiles
   default to red.
+- Use kind **None** for a neutral tile; if it also has no actor, the tile header
+  is hidden.
 - Click any edge to restyle it — label, line (solid/dashed/dotted), and color.
 - Cluster steps into labeled group regions; give tiles and edges custom colors.
 - `Delete` removes the selection, `Esc` deselects.

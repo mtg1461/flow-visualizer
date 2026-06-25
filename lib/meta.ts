@@ -2,6 +2,7 @@ import type { Actor, Explanation, StepKind } from "./types";
 import type { ResolvedTheme } from "./theme";
 
 const DARK_GRAPH_COLORS = {
+  none: "#b8bfcc",
   trigger: "#ff6b6b",
   input: "#7fd6c2",
   process: "#9b9bff",
@@ -15,6 +16,7 @@ const DARK_GRAPH_COLORS = {
 } as const;
 
 const LIGHT_GRAPH_COLORS: Record<keyof typeof DARK_GRAPH_COLORS, string> = {
+  none: "#515b6c",
   trigger: "#c73535",
   input: "#087f6b",
   process: "#6264df",
@@ -30,6 +32,8 @@ const LIGHT_GRAPH_COLORS: Record<keyof typeof DARK_GRAPH_COLORS, string> = {
 type GraphColorKey = keyof typeof DARK_GRAPH_COLORS;
 
 const GRAPH_COLOR_KEYS: Record<string, GraphColorKey> = {
+  [DARK_GRAPH_COLORS.none]: "none",
+  [LIGHT_GRAPH_COLORS.none]: "none",
   [DARK_GRAPH_COLORS.trigger]: "trigger",
   [LIGHT_GRAPH_COLORS.trigger]: "trigger",
   [DARK_GRAPH_COLORS.input]: "input",
@@ -53,6 +57,7 @@ const GRAPH_COLOR_KEYS: Record<string, GraphColorKey> = {
 } as const;
 
 export const KIND_META: Record<StepKind, { label: string; color: string }> = {
+  none: { label: "None", color: "#b8bfcc" },
   trigger: { label: "Trigger", color: "#ff6b6b" },
   input: { label: "Input", color: "#7fd6c2" },
   process: { label: "Process", color: "#9b9bff" },

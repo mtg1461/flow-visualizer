@@ -1338,10 +1338,11 @@ export function Canvas({
             const customColor = edge.color
               ? resolveGraphColor(edge.color, resolvedTheme)
               : undefined;
+            const stroke = customColor ?? edgeStyle.forward.stroke;
             const style = {
-              stroke: customColor ?? base.stroke,
+              stroke,
               dash: edge.line ? LINE_DASH[edge.line] : base.dash,
-              marker: customColor ? markerId(customColor) : `tip-${base.marker}`,
+              marker: customColor ? markerId(customColor) : "tip-soft",
             };
             const isSel = selectedEdgeKey === edge.key;
             return (
@@ -1411,11 +1412,7 @@ export function Canvas({
               : undefined;
             const tone = customColor
               ? ""
-              : edge.kind === "loop"
-                ? "border-accent/50 text-accent"
-                : edge.backward
-                  ? "border-amber/50 text-amber"
-                  : "border-line-strong text-text/90";
+              : "border-line-strong text-text/90";
             return (
               <button
                 key={`lbl-${edge.key}`}

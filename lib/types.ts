@@ -1,6 +1,7 @@
 /** The shape an AI agent produces to describe how something works. */
 
 export type StepKind =
+  | "none"
   | "trigger"
   | "input"
   | "process"

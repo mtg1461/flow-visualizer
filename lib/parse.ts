@@ -7,6 +7,7 @@ import type {
 } from "./types";
 
 const KINDS: StepKind[] = [
+  "none",
   "trigger",
   "input",
   "process",
