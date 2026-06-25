@@ -22,6 +22,7 @@ import {
   NODE_W,
   type CellRect,
   type EdgeRef,
+  type MultiSelectionItem,
   type Pos,
   type Selection,
   cellInRect,
@@ -43,9 +44,14 @@ interface Props {
   fitSignal: number;
   /** Newly created items ask the viewport to pan to their grid cell. */
   focusTarget: (Pos & { nonce: number }) | null;
-  onSelect: (sel: Selection) => void;
+  onSelect: (sel: Selection, additive?: boolean) => void;
   onClearSelection: () => void;
   onMoveNode: (id: string, cell: Pos) => void;
+  onMoveSelection: (
+    items: MultiSelectionItem[],
+    dCol: number,
+    dRow: number
+  ) => void;
   onMoveGroup: (
     id: string,
     dCol: number,
@@ -82,6 +88,14 @@ const LINE_DASH = {
 
 const markerId = (color: string) => `tip-c-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
 
+function selectionItems(sel: Selection | null): MultiSelectionItem[] {
+  if (!sel) return [];
+  if (sel.kind === "step" || sel.kind === "group")
+    return [{ kind: sel.kind, id: sel.id }];
+  if (sel.kind === "multi") return sel.items;
+  return [];
+}
+
 export function Canvas({
   doc,
   actorColorScope,
@@ -93,6 +107,7 @@ export function Canvas({
   onSelect,
   onClearSelection,
   onMoveNode,
+  onMoveSelection,
   onMoveGroup,
   onResizeGroup,
   onStartConnect,
@@ -115,6 +130,14 @@ export function Canvas({
     /** Everything the drag carries: members plus adopted strays inside. */
     members: string[];
   } | null>(null);
+  const [multiDrag, setMultiDrag] = useState<{
+    items: MultiSelectionItem[];
+    dCol: number;
+    dRow: number;
+    valid: boolean;
+    members: string[];
+    groups: string[];
+  } | null>(null);
   const [groupResize, setGroupResize] = useState<{
     id: string;
     col: number;
@@ -135,6 +158,7 @@ export function Canvas({
     offX: number;
     offY: number;
     moved: boolean;
+    additive: boolean;
   } | null>(null);
 
   const colors = useMemo(
@@ -146,6 +170,26 @@ export function Canvas({
     () => new Map((doc.actors ?? []).map((p) => [p.id, p])),
     [doc]
   );
+  const selectedItems = useMemo(() => selectionItems(selection), [selection]);
+  const selectedStepIds = useMemo(
+    () =>
+      new Set(
+        selectedItems
+          .filter((item) => item.kind === "step")
+          .map((item) => item.id)
+      ),
+    [selectedItems]
+  );
+  const selectedGroupIds = useMemo(
+    () =>
+      new Set(
+        selectedItems
+          .filter((item) => item.kind === "group")
+          .map((item) => item.id)
+      ),
+    [selectedItems]
+  );
+  const isMultiSelection = selectedItems.length > 1;
 
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -192,8 +236,20 @@ export function Canvas({
       }
       return m;
     }
+    if (multiDrag && (multiDrag.dCol || multiDrag.dRow)) {
+      const m = new Map(positions);
+      for (const id of multiDrag.members) {
+        const p = positions.get(id);
+        if (p)
+          m.set(id, {
+            col: p.col + multiDrag.dCol,
+            row: p.row + multiDrag.dRow,
+          });
+      }
+      return m;
+    }
     return positions;
-  }, [positions, drag, dragCell, groupDrag, doc.groups]);
+  }, [positions, drag, dragCell, groupDrag, multiDrag]);
 
   const edges = useMemo(
     () => routeEdges(doc, livePositions),
@@ -522,10 +578,18 @@ export function Canvas({
   const groupRects = useMemo(() => {
     return (previewGroups ?? [])
       .map((g) => {
-        const shifting =
+        const groupShift =
           groupDrag && groupDrag.id === g.id
             ? { dc: groupDrag.dCol, dr: groupDrag.dRow }
             : { dc: 0, dr: 0 };
+        const multiShift =
+          multiDrag?.groups.includes(g.id)
+            ? { dc: multiDrag.dCol, dr: multiDrag.dRow }
+            : { dc: 0, dr: 0 };
+        const shifting = {
+          dc: groupShift.dc + multiShift.dc,
+          dr: groupShift.dr + multiShift.dr,
+        };
         let effective = g.grid
           ? {
               ...g,
@@ -570,7 +634,9 @@ export function Canvas({
           id: g.id,
           label: g.label,
           color: groupColorMap.get(g.id) ?? "#9b9bff",
-          invalid: groupDrag?.id === g.id && !groupDrag.valid,
+          invalid:
+            (groupDrag?.id === g.id && !groupDrag.valid) ||
+            (!!multiDrag?.groups.includes(g.id) && !multiDrag.valid),
           left: rect.minC * CELL_W + GX - 18,
           top: rect.minR * CELL_H + GY - 34,
           width: (rect.maxC - rect.minC) * CELL_W + NODE_W + 36,
@@ -578,7 +644,14 @@ export function Canvas({
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [previewGroups, livePositions, groupDrag, groupResize, groupColorMap]);
+  }, [
+    previewGroups,
+    livePositions,
+    groupDrag,
+    multiDrag,
+    groupResize,
+    groupColorMap,
+  ]);
 
   // group dragging — moves every member tile by a cell delta
   const groupDragRef = useRef<{
@@ -586,11 +659,142 @@ export function Canvas({
     sx: number;
     sy: number;
     moved: boolean;
+    additive: boolean;
   } | null>(null);
+
+  const multiDragRef = useRef<{
+    items: MultiSelectionItem[];
+    sx: number;
+    sy: number;
+    moved: boolean;
+    additive: boolean;
+  } | null>(null);
+
+  const selectedMoveSet = useCallback(
+    (items: MultiSelectionItem[]) => {
+      const groupIds = new Set(
+        items.filter((item) => item.kind === "group").map((item) => item.id)
+      );
+      const members = new Set(
+        items.filter((item) => item.kind === "step").map((item) => item.id)
+      );
+      for (const group of doc.groups ?? []) {
+        if (!groupIds.has(group.id)) continue;
+        for (const id of group.steps) members.add(id);
+      }
+      return { members: [...members], groups: [...groupIds] };
+    },
+    [doc.groups]
+  );
+
+  const multiMoveValid = useCallback(
+    (members: string[], groups: string[], dCol: number, dRow: number) => {
+      const memberSet = new Set(members);
+      const groupSet = new Set(groups);
+      for (const sid of members) {
+        const p = positions.get(sid);
+        if (!p) continue;
+        const col = p.col + dCol;
+        const row = p.row + dRow;
+        if (
+          col < GRID_LIMITS.minCol ||
+          col > GRID_LIMITS.maxCol ||
+          row < GRID_LIMITS.minRow ||
+          row > GRID_LIMITS.maxRow
+        )
+          return false;
+        for (const [oid, op] of positions) {
+          if (!memberSet.has(oid) && op.col === col && op.row === row)
+            return false;
+        }
+      }
+
+      const otherRects = (doc.groups ?? [])
+        .filter((group) => !groupSet.has(group.id))
+        .map((group) => groupCellRect(group, positions))
+        .filter((rect): rect is CellRect => !!rect);
+      for (const group of doc.groups ?? []) {
+        if (!groupSet.has(group.id)) continue;
+        const rect = groupCellRect(group, positions);
+        if (!rect) continue;
+        const shifted = {
+          minC: rect.minC + dCol,
+          maxC: rect.maxC + dCol,
+          minR: rect.minR + dRow,
+          maxR: rect.maxR + dRow,
+        };
+        if (
+          shifted.minC < GRID_LIMITS.minCol ||
+          shifted.maxC > GRID_LIMITS.maxCol ||
+          shifted.minR < GRID_LIMITS.minRow ||
+          shifted.maxR > GRID_LIMITS.maxRow ||
+          otherRects.some((other) => rectsOverlap(shifted, other))
+        )
+          return false;
+      }
+      return true;
+    },
+    [doc.groups, positions]
+  );
+
+  const startMultiDrag = (
+    items: MultiSelectionItem[],
+    primary: MultiSelectionItem,
+    additive: boolean,
+    e: React.PointerEvent
+  ) => {
+    const w = toWorld(e.clientX, e.clientY);
+    const { members, groups } = selectedMoveSet(items);
+    multiDragRef.current = { items, sx: w.x, sy: w.y, moved: false, additive };
+    let last:
+      | {
+          dCol: number;
+          dRow: number;
+          valid: boolean;
+          members: string[];
+          groups: string[];
+        }
+      | null = null;
+
+    const move = (ev: PointerEvent) => {
+      const d = multiDragRef.current;
+      if (!d) return;
+      const wp = toWorld(ev.clientX, ev.clientY);
+      if (!d.moved && Math.abs(wp.x - d.sx) + Math.abs(wp.y - d.sy) < 8)
+        return;
+      d.moved = true;
+      const dCol = Math.round((wp.x - d.sx) / CELL_W);
+      const dRow = Math.round((wp.y - d.sy) / CELL_H);
+      const valid = multiMoveValid(members, groups, dCol, dRow);
+      last = { dCol, dRow, valid, members, groups };
+      setMultiDrag({ items, dCol, dRow, valid, members, groups });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const d = multiDragRef.current;
+      multiDragRef.current = null;
+      setMultiDrag(null);
+      if (!d) return;
+      if (!d.moved) {
+        if (connectFrom) onCancelConnect();
+        else onSelect(primary, additive);
+      } else if (last && last.valid && (last.dCol || last.dRow)) {
+        onMoveSelection(d.items, last.dCol, last.dRow);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   const startGroupDrag = (id: string) => (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    const additive = e.ctrlKey || e.metaKey;
+    if (!e.altKey && isMultiSelection && selectedGroupIds.has(id)) {
+      startMultiDrag(selectedItems, { kind: "group", id }, additive, e);
+      return;
+    }
     const mode: "all" | "region" = e.altKey ? "region" : "all";
     const g0 = doc.groups?.find((x) => x.id === id);
     const rect0 = g0 ? groupCellRect(g0, positions) : null;
@@ -632,7 +836,7 @@ export function Canvas({
     const members = [...carried];
 
     const w = toWorld(e.clientX, e.clientY);
-    groupDragRef.current = { id, sx: w.x, sy: w.y, moved: false };
+    groupDragRef.current = { id, sx: w.x, sy: w.y, moved: false, additive };
     let last: { dCol: number; dRow: number; valid: boolean } | null = null;
 
     const move = (ev: PointerEvent) => {
@@ -707,7 +911,7 @@ export function Canvas({
       if (!d) return;
       if (!d.moved) {
         if (connectFrom) onCancelConnect();
-        else onSelect({ kind: "group", id: d.id });
+        else onSelect({ kind: "group", id: d.id }, d.additive);
       } else if (last && last.valid && (last.dCol || last.dRow)) {
         onMoveGroup(d.id, last.dCol, last.dRow, mode);
       }
@@ -720,6 +924,11 @@ export function Canvas({
   const startNodeDrag = (id: string) => (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    const additive = e.ctrlKey || e.metaKey;
+    if (!connectFrom && isMultiSelection && selectedStepIds.has(id)) {
+      startMultiDrag(selectedItems, { kind: "step", id }, additive, e);
+      return;
+    }
     const w = toWorld(e.clientX, e.clientY);
     const p = positions.get(id);
     if (!p) return;
@@ -728,6 +937,7 @@ export function Canvas({
       offX: w.x - (p.col * CELL_W + GX),
       offY: w.y - (p.row * CELL_H + GY),
       moved: false,
+      additive,
     };
 
     let last: { wx: number; wy: number } | null = null;
@@ -756,7 +966,7 @@ export function Canvas({
         // click, not drag
         if (connectFrom && connectFrom !== d.id) onCompleteConnect(d.id);
         else if (connectFrom === d.id) onCancelConnect();
-        else onSelect({ kind: "step", id: d.id });
+        else onSelect({ kind: "step", id: d.id }, d.additive);
       } else if (last) {
         const cell = nearestFreeCell(
           positions,
@@ -804,7 +1014,7 @@ export function Canvas({
             top: GRID_LIMITS.minRow * CELL_H,
             width: (GRID_LIMITS.maxCol - GRID_LIMITS.minCol + 1) * CELL_W,
             height: (GRID_LIMITS.maxRow - GRID_LIMITS.minRow + 1) * CELL_H,
-            opacity: drag ? 1 : 0.6,
+            opacity: drag || multiDrag ? 1 : 0.6,
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
               `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
             )}")`,
@@ -814,7 +1024,7 @@ export function Canvas({
 
         {/* group regions — interactive: click selects, drag moves members */}
         {groupRects.map((r) => {
-          const isSel = selection?.kind === "group" && selection.id === r.id;
+          const isSel = selectedGroupIds.has(r.id);
           return (
             <div
               key={r.id}
@@ -1049,7 +1259,8 @@ export function Canvas({
         {doc.steps.map((step) => {
           const p = livePositions.get(step.id);
           if (!p) return null;
-          const isDragging = drag?.id === step.id;
+          const isDragging =
+            drag?.id === step.id || !!multiDrag?.members.includes(step.id);
           const x = isDragging && drag ? drag.wx : p.col * CELL_W + GX;
           const y = isDragging && drag ? drag.wy : p.row * CELL_H + GY;
           return (
@@ -1058,7 +1269,7 @@ export function Canvas({
               step={step}
               x={x}
               y={y}
-              selected={selection?.kind === "step" && selection.id === step.id}
+              selected={selectedStepIds.has(step.id)}
               connectSource={connectFrom === step.id}
               connectTarget={!!connectFrom && connectFrom !== step.id}
               dragging={isDragging}

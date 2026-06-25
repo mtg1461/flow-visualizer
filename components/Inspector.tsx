@@ -29,6 +29,7 @@ export interface EditorActions {
   updateDoc: (patch: Partial<Pick<Explanation, "title" | "summary">>) => void;
   updateStep: (id: string, patch: Partial<Step>) => void;
   deleteStep: (id: string) => void;
+  deleteSelection: () => void;
   startConnect: (id: string) => void;
   deleteEdge: (ref: EdgeRef) => void;
   updateEdgeLabel: (ref: EdgeRef, label: string) => void;
@@ -69,6 +70,8 @@ export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
   const panelKey = selection
     ? selection.kind === "edge"
       ? `${selection.kind}:${JSON.stringify(selection.ref)}`
+      : selection.kind === "multi"
+        ? `multi:${selection.items.map((item) => `${item.kind}:${item.id}`).join("|")}`
       : `${selection.kind}:${selection.id}`
     : "doc";
 
@@ -89,6 +92,8 @@ export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
             group={doc.groups?.find((g) => g.id === selection.id)}
             actions={actions}
           />
+        ) : selection?.kind === "multi" ? (
+          <MultiPanel doc={doc} selection={selection} actions={actions} />
         ) : (
           <DocPanel
             doc={doc}
@@ -98,6 +103,77 @@ export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
         )}
       </div>
     </aside>
+  );
+}
+
+/* --------------------------------------------------------------- multi */
+
+function MultiPanel({
+  doc,
+  selection,
+  actions,
+}: {
+  doc: Explanation;
+  selection: Extract<Selection, { kind: "multi" }>;
+  actions: EditorActions;
+}) {
+  const stepIds = new Set(
+    selection.items.filter((item) => item.kind === "step").map((item) => item.id)
+  );
+  const groupIds = new Set(
+    selection.items
+      .filter((item) => item.kind === "group")
+      .map((item) => item.id)
+  );
+  const steps = doc.steps.filter((step) => stepIds.has(step.id));
+  const groups = (doc.groups ?? []).filter((group) => groupIds.has(group.id));
+  const total = steps.length + groups.length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-mute">
+          Selected
+        </span>
+        <button
+          type="button"
+          title="Delete selected"
+          onClick={actions.deleteSelection}
+          disabled={total === 0}
+          className="cursor-pointer rounded-md p-1.5 text-faint transition-colors hover:bg-rose/10 hover:text-rose disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <p className="mt-3 text-[12.5px] text-mute">
+        {total} item{total === 1 ? "" : "s"} selected
+      </p>
+
+      <div className="mt-4 space-y-1.5">
+        {steps.slice(0, 5).map((step) => (
+          <div
+            key={`step:${step.id}`}
+            className="rounded-lg border border-line bg-surface px-2.5 py-2 text-[12px] text-text/85"
+          >
+            {truncate(step.title, 32)}
+          </div>
+        ))}
+        {groups.slice(0, 4).map((group) => (
+          <div
+            key={`group:${group.id}`}
+            className="rounded-lg border border-line bg-surface px-2.5 py-2 text-[12px] text-text/85"
+          >
+            {truncate(group.label, 32)}
+          </div>
+        ))}
+        {total > 9 && (
+          <p className="px-1 text-[11.5px] text-faint">
+            +{total - 9} more
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 

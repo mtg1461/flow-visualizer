@@ -35,10 +35,13 @@ export type EdgeRef =
   | { type: "branch"; from: string; index: number }
   | { type: "loop"; index: number };
 
+export type MultiSelectionItem = { kind: "step" | "group"; id: string };
+
 export type Selection =
   | { kind: "step"; id: string }
   | { kind: "edge"; ref: EdgeRef }
-  | { kind: "group"; id: string };
+  | { kind: "group"; id: string }
+  | { kind: "multi"; items: MultiSelectionItem[] };
 
 export interface CellRect {
   minC: number;
