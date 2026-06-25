@@ -5,6 +5,7 @@ import type { FlowFile } from "@/lib/types";
 import { SAMPLE } from "@/lib/sample";
 import { parseFlowFile } from "@/lib/parse";
 import { Editor } from "@/components/Editor";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { STORAGE_KEY } from "@/hooks/useEditorHistory";
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
       if (stored) {
         const result = parseFlowFile(stored);
         if (result.ok) doc = result.data;
+        else localStorage.removeItem(STORAGE_KEY);
       }
     } catch {
       // unreadable storage — fall back to the sample
@@ -24,6 +26,19 @@ export default function Home() {
     setInitial(doc);
   }, []);
 
-  if (!initial) return <div className="h-dvh bg-bg" />;
-  return <Editor initial={initial} />;
+  if (!initial) {
+    return (
+      <main className="flex h-dvh items-center justify-center bg-bg p-5">
+        <div className="rounded-xl border border-line-strong bg-raise px-4 py-3 text-[12.5px] text-mute">
+          Loading Flow Visualizer...
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <AppErrorBoundary>
+      <Editor initial={initial} />
+    </AppErrorBoundary>
+  );
 }

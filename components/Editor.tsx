@@ -923,6 +923,7 @@ export function Editor({ initial }: Props) {
           preview={fileConnection.preview}
           allowLocalPath={LOCAL_FILES_ENABLED}
           onConnectPreview={fileConnection.connectPending}
+          onRequestSaveAccess={fileConnection.requestPendingSaveAccess}
           onClearPreview={fileConnection.clearPreview}
           onBrowse={fileConnection.browseFile}
           onCreateEmpty={fileConnection.createEmpty}

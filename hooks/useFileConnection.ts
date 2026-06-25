@@ -14,7 +14,7 @@ import { LOCAL_FILES_ENABLED } from "@/lib/config";
 /** Remembers the last connected disk path so a dev refresh reconnects.
  *  Path connections only exist when LOCAL_FILES_ENABLED, so this is inert
  *  on a hosted build. Browser-handle connections aren't restorable here. */
-const LAST_PATH_KEY = "flow-visualizer:lastPath";
+export const LAST_PATH_KEY = "flow-visualizer:lastPath";
 
 /** Starter document written when the user creates a new empty flow file. */
 const EMPTY_FLOW: FlowFile = {
@@ -91,6 +91,7 @@ type PendingConnection =
       lastModified: number;
       size: number;
       handle: BrowserFileHandle;
+      saveAccess: "needed" | "ready";
     }
   | {
       kind: "example";
@@ -185,6 +186,17 @@ function toConnectionPreview(
   };
 }
 
+async function browserSaveAccessState(
+  handle: BrowserFileHandle
+): Promise<"needed" | "ready"> {
+  if (!handle.createWritable) return "needed";
+  if (handle.queryPermission) {
+    const permission = await handle.queryPermission({ mode: "readwrite" });
+    if (permission === "granted") return "ready";
+  }
+  return handle.requestPermission ? "needed" : "ready";
+}
+
 export function useFileConnection({
   file,
   activeViewId,
@@ -217,7 +229,7 @@ export function useFileConnection({
         ? toConnectionPreview(
             pendingConnection.sourceName,
             pendingConnection.kind === "browser" &&
-              !!pendingConnection.handle.requestPermission,
+              pendingConnection.saveAccess === "needed",
             pendingConnection.normalized
           )
         : null,
@@ -290,6 +302,7 @@ export function useFileConnection({
       const result = parseFlowFile(await file.text());
       if (!result.ok) throw new Error(result.error);
       const normalized = prepareFile(result.data);
+      const saveAccess = await browserSaveAccessState(handle);
       setPendingConnection({
         kind: "browser",
         normalized,
@@ -297,6 +310,7 @@ export function useFileConnection({
         lastModified: file.lastModified,
         size: file.size,
         handle,
+        saveAccess,
       });
       setStatus("watching");
     } catch (previewError) {
@@ -549,15 +563,35 @@ export function useFileConnection({
   );
 
   const requestBrowserWrite = useCallback(async (handle: BrowserFileHandle) => {
+    if (!handle.createWritable)
+      throw new Error("This browser did not provide write access for the selected file.");
     if (handle.requestPermission) {
       const permission = await handle.requestPermission({ mode: "readwrite" });
       if (permission !== "granted")
         throw new Error("Write permission was not granted for this file.");
-      return;
     }
-    if (!handle.createWritable)
-      throw new Error("This browser did not provide write access for the selected file.");
   }, []);
+
+  const requestPendingSaveAccess = useCallback(async () => {
+    if (!pendingConnection || pendingConnection.kind !== "browser") return;
+    setError(null);
+    setStatus("loading");
+    try {
+      await requestBrowserWrite(pendingConnection.handle);
+      setPendingConnection({
+        ...pendingConnection,
+        saveAccess: "ready",
+      });
+      setStatus("watching");
+    } catch (permissionError) {
+      setError(
+        permissionError instanceof Error
+          ? permissionError.message
+          : "Could not get save permission."
+      );
+      setStatus("error");
+    }
+  }, [pendingConnection, requestBrowserWrite]);
 
   const connectPending = useCallback(async (selectedViewId: string) => {
     if (!pendingConnection) return;
@@ -579,7 +613,8 @@ export function useFileConnection({
         setExampleMode(false);
         rememberPath(pendingConnection.path);
       } else if (pendingConnection.kind === "browser") {
-        await requestBrowserWrite(pendingConnection.handle);
+        if (pendingConnection.saveAccess !== "ready")
+          await requestBrowserWrite(pendingConnection.handle);
         setBoundFile(null);
         setExampleMode(false);
         setBrowserFile({
@@ -785,6 +820,7 @@ export function useFileConnection({
     browseFile,
     createEmpty,
     connectDropped,
+    requestPendingSaveAccess,
     connectPending,
     loadExample,
     disconnect,

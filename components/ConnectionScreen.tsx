@@ -11,6 +11,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { FlowMark } from "./FlowMark";
+import { SaveAccessScreen } from "./SaveAccessScreen";
 import { ViewSelectionScreen } from "./ViewSelectionScreen";
 
 export type FileSyncStatus =
@@ -41,6 +42,7 @@ interface Props {
   /** Whether disk paths apply (off on a hosted build) — tunes the drop copy. */
   allowLocalPath: boolean;
   onConnectPreview: (viewId: string) => void;
+  onRequestSaveAccess: () => void;
   onClearPreview: () => void;
   onBrowse: () => void;
   onCreateEmpty: () => void;
@@ -56,6 +58,7 @@ export function ConnectionScreen({
   preview,
   allowLocalPath,
   onConnectPreview,
+  onRequestSaveAccess,
   onClearPreview,
   onBrowse,
   onCreateEmpty,
@@ -74,6 +77,19 @@ export function ConnectionScreen({
   };
 
   if (preview) {
+    if (preview.canRequestWrite) {
+      return (
+        <SaveAccessScreen
+          status={status}
+          error={error}
+          preview={preview}
+          onAllowSave={onRequestSaveAccess}
+          onClear={onClearPreview}
+          onAgentPrompt={onAgentPrompt}
+        />
+      );
+    }
+
     return (
       <ViewSelectionScreen
         status={status}
