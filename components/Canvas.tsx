@@ -41,6 +41,8 @@ interface Props {
   connectFrom: string | null;
   /** Increment to request a fit-to-view (e.g. after Tidy). */
   fitSignal: number;
+  /** Newly created items ask the viewport to pan to their grid cell. */
+  focusTarget: (Pos & { nonce: number }) | null;
   onSelect: (sel: Selection) => void;
   onClearSelection: () => void;
   onMoveNode: (id: string, cell: Pos) => void;
@@ -87,6 +89,7 @@ export function Canvas({
   selection,
   connectFrom,
   fitSignal,
+  focusTarget,
   onSelect,
   onClearSelection,
   onMoveNode,
@@ -250,6 +253,21 @@ export function Canvas({
       fitRef.current();
     }
   }, [fitSignal]);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !focusTarget) return;
+    const inspectorReserve = root.clientWidth >= 900 ? 332 : 0;
+    const visibleWidth = Math.max(320, root.clientWidth - inspectorReserve);
+    const k = Math.max(viewRef.current.k, 0.78);
+    const targetX = focusTarget.col * CELL_W + CELL_W / 2;
+    const targetY = focusTarget.row * CELL_H + CELL_H / 2;
+    userMovedView.current = true;
+    setView({
+      x: visibleWidth / 2 - targetX * k,
+      y: root.clientHeight / 2 - targetY * k,
+      k,
+    });
+  }, [focusTarget]);
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;

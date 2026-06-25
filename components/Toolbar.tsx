@@ -6,8 +6,8 @@ import {
   Check,
   ChevronDown,
   GitBranch,
-  Group,
   Plus,
+  RotateCcw,
   Undo2,
   Unplug,
   Wand2,
@@ -33,6 +33,7 @@ interface Props {
   onAddView: () => void;
   onViewSelect: (id: string) => void;
   onTidy: () => void;
+  onResetLayout: () => void;
   onAgentPrompt: () => void;
   onDisconnect: () => void;
 }
@@ -49,6 +50,7 @@ export function Toolbar({
   onAddView,
   onViewSelect,
   onTidy,
+  onResetLayout,
   onAgentPrompt,
   onDisconnect,
 }: Props) {
@@ -220,7 +222,7 @@ export function Toolbar({
           onClick={onAddGroup}
           className="flex h-8 w-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-raise text-text/90 transition-[background-color,transform] duration-150 hover:-translate-y-px hover:bg-tile active:translate-y-0 md:w-auto md:px-3"
         >
-          <Group size={13} />
+          <Plus size={13} />
           <span className="hidden text-[12.5px] md:inline">Group</span>
         </button>
       </div>
@@ -232,6 +234,15 @@ export function Toolbar({
       >
         <Wand2 size={13} strokeWidth={2.7} />
         Tidy
+      </button>
+      <button
+        type="button"
+        title="Discard saved positions and reflow the active view"
+        onClick={onResetLayout}
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-amber/55 bg-amber/12 px-3 text-[12.5px] font-medium text-amber transition-[background-color,border-color,transform] duration-150 hover:-translate-y-px hover:border-amber/75 hover:bg-amber/18 active:translate-y-0"
+      >
+        <RotateCcw size={13} strokeWidth={2.4} />
+        Reset
       </button>
       <button
         type="button"

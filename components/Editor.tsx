@@ -112,8 +112,18 @@ export function Editor({ initial }: Props) {
   const [resetLayoutOpen, setResetLayoutOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [fitSignal, setFitSignal] = useState(0);
+  const [focusTarget, setFocusTarget] = useState<
+    (Pos & { nonce: number }) | null
+  >(null);
   const activeViewIdRef = useRef(activeViewId);
   activeViewIdRef.current = activeViewId;
+
+  const focusCell = useCallback((cell: Pos) => {
+    setFocusTarget((current) => ({
+      ...cell,
+      nonce: (current?.nonce ?? 0) + 1,
+    }));
+  }, []);
 
   const onRestore = useCallback((restored: FlowFile) => {
     const restoredView =
@@ -334,8 +344,9 @@ export function Editor({ initial }: Props) {
         : d.groups;
       commit({ ...d, steps, groups });
       setSelection({ kind: "step", id });
+      focusCell(cell);
     },
-    [commit, selection, positions]
+    [commit, focusCell, selection, positions]
   );
 
   const moveNode = useCallback(
@@ -599,8 +610,9 @@ export function Editor({ initial }: Props) {
         ],
       });
       setSelection({ kind: "group", id });
+      focusCell(spot);
     },
-    [commit]
+    [commit, focusCell]
   );
 
   const addGroupFromToolbar = useCallback(() => {
@@ -623,6 +635,7 @@ export function Editor({ initial }: Props) {
         if (rect && !otherRects.some((o) => rectsOverlap(rect, o))) {
           commit({ ...d, groups: [...existing, candidate] });
           setSelection({ kind: "group", id });
+          focusCell(stepCell);
           return;
         }
       }
@@ -664,7 +677,7 @@ export function Editor({ initial }: Props) {
       col: Math.min(GRID_LIMITS.maxCol - 1, minCol),
       row: Math.min(GRID_LIMITS.maxRow - 1, maxRow + 1),
     });
-  }, [addGroupAt, commit, selection]);
+  }, [addGroupAt, commit, focusCell, selection]);
 
   const completeConnect = useCallback(
     (to: string) => {
@@ -805,7 +818,6 @@ export function Editor({ initial }: Props) {
           { ...docRef.current, ...patch },
           `doc:${Object.keys(patch).sort().join(",")}`
         ),
-      resetLayout: () => setResetLayoutOpen(true),
       updateStep,
       deleteStep,
       startConnect: (id) => setConnectFrom(id),
@@ -962,6 +974,7 @@ export function Editor({ initial }: Props) {
         onAddView={addView}
         onViewSelect={switchView}
         onTidy={tidy}
+        onResetLayout={() => setResetLayoutOpen(true)}
         onAgentPrompt={() => setAgentPromptOpen(true)}
         onDisconnect={() => setDisconnectOpen(true)}
       />
@@ -973,6 +986,7 @@ export function Editor({ initial }: Props) {
           selection={selection}
           connectFrom={connectFrom}
           fitSignal={fitSignal}
+          focusTarget={focusTarget}
           onSelect={setSelection}
           onClearSelection={() => setSelection(null)}
           onMoveNode={moveNode}
