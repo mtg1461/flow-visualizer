@@ -2,6 +2,7 @@
 
 import {
   ChevronDown,
+  Copy,
   CornerDownRight,
   Link2,
   Plus,
@@ -23,13 +24,16 @@ import {
   groupColors,
   withAlpha,
 } from "@/lib/meta";
-import { type EdgeRef, type Selection } from "@/lib/graph";
+import { type EdgeRef } from "@/lib/graph";
+import { type Selection } from "@/lib/selection";
 
 export interface EditorActions {
   updateDoc: (patch: Partial<Pick<Explanation, "title" | "summary">>) => void;
   updateStep: (id: string, patch: Partial<Step>) => void;
   deleteStep: (id: string) => void;
   deleteSelection: () => void;
+  duplicateSelection: () => void;
+  groupSelection: () => void;
   startConnect: (id: string) => void;
   deleteEdge: (ref: EdgeRef) => void;
   updateEdgeLabel: (ref: EdgeRef, label: string) => void;
@@ -128,6 +132,7 @@ function MultiPanel({
   const steps = doc.steps.filter((step) => stepIds.has(step.id));
   const groups = (doc.groups ?? []).filter((group) => groupIds.has(group.id));
   const total = steps.length + groups.length;
+  const groupable = steps.length >= 2;
 
   return (
     <div>
@@ -149,6 +154,27 @@ function MultiPanel({
       <p className="mt-3 text-[12.5px] text-mute">
         {total} item{total === 1 ? "" : "s"} selected
       </p>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={actions.duplicateSelection}
+          disabled={total === 0}
+          className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent/10 px-2.5 py-2 text-[11.5px] font-medium text-accent transition-colors hover:border-accent/55 hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Copy size={12} />
+          Duplicate
+        </button>
+        <button
+          type="button"
+          onClick={actions.groupSelection}
+          disabled={!groupable}
+          className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-teal/35 bg-teal/10 px-2.5 py-2 text-[11.5px] font-medium text-teal transition-colors hover:border-teal/55 hover:bg-teal/15 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus size={12} />
+          Group
+        </button>
+      </div>
 
       <div className="mt-4 space-y-1.5">
         {steps.slice(0, 5).map((step) => (

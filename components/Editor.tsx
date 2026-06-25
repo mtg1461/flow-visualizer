@@ -5,19 +5,23 @@ import type { EdgeLine, Explanation, FlowFile, FlowView, Step } from "@/lib/type
 import {
   GRID_LIMITS,
   type EdgeRef,
-  type MultiSelectionItem,
   type Pos,
-  type Selection,
   cellInRect,
   groupCellRect,
   layoutPositions,
   nearestFreeCell,
   normalize,
+  rectToGrid,
   rectsOverlap,
   tidyLayout,
   tidyPreservingLayout,
   type CellRect,
 } from "@/lib/graph";
+import {
+  toggleSelectionItem,
+  validSelection,
+  type Selection,
+} from "@/lib/selection";
 import { Canvas } from "./Canvas";
 import { ContextMenu, type MenuState } from "./ContextMenu";
 import { Inspector, type EditorActions } from "./Inspector";
@@ -29,6 +33,7 @@ import { AgentPromptDialog } from "./AgentPromptDialog";
 import { HowItWorksDialog } from "./HowItWorksDialog";
 import { useEditorHistory } from "@/hooks/useEditorHistory";
 import { useFileConnection } from "@/hooks/useFileConnection";
+import { useSelectionMutations } from "@/hooks/useSelectionMutations";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
 import { groupColors } from "@/lib/meta";
 
@@ -56,89 +61,6 @@ function stabilizeGroupMembers(
     return { ...s, grid: { col: p.col, row: p.row } };
   });
   return changed ? { ...next, steps } : next;
-}
-
-function rectToGrid(rect: {
-  minC: number;
-  maxC: number;
-  minR: number;
-  maxR: number;
-}) {
-  return {
-    col: rect.minC,
-    row: rect.minR,
-    cols: rect.maxC - rect.minC + 1,
-    rows: rect.maxR - rect.minR + 1,
-  };
-}
-
-/** Drops a selection that points at something the restored doc lacks. */
-function validSelection(
-  doc: Explanation,
-  sel: Selection | null
-): Selection | null {
-  if (!sel) return null;
-  if (sel.kind === "step")
-    return doc.steps.some((s) => s.id === sel.id) ? sel : null;
-  if (sel.kind === "group")
-    return doc.groups?.some((g) => g.id === sel.id) ? sel : null;
-  if (sel.kind === "multi") {
-    return normalizeSelection(
-      sel.items.filter((item) =>
-        item.kind === "step"
-          ? doc.steps.some((s) => s.id === item.id)
-          : doc.groups?.some((g) => g.id === item.id)
-      )
-    );
-  }
-  const ref = sel.ref;
-  if (ref.type === "flow")
-    return doc.steps.find((s) => s.id === ref.from)?.then ? sel : null;
-  if (ref.type === "branch")
-    return (doc.steps.find((s) => s.id === ref.from)?.branches?.length ?? 0) >
-      ref.index
-      ? sel
-      : null;
-  return (doc.loops?.length ?? 0) > ref.index ? sel : null;
-}
-
-function selectionItems(sel: Selection | null): MultiSelectionItem[] {
-  if (!sel) return [];
-  if (sel.kind === "step" || sel.kind === "group")
-    return [{ kind: sel.kind, id: sel.id }];
-  if (sel.kind === "multi") return sel.items;
-  return [];
-}
-
-function selectionItemKey(item: MultiSelectionItem) {
-  return `${item.kind}:${item.id}`;
-}
-
-function normalizeSelection(items: MultiSelectionItem[]): Selection | null {
-  const seen = new Set<string>();
-  const unique = items.filter((item) => {
-    const key = selectionItemKey(item);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  if (unique.length === 0) return null;
-  if (unique.length === 1) return unique[0];
-  return { kind: "multi", items: unique };
-}
-
-function toggleSelectionItem(
-  current: Selection | null,
-  item: MultiSelectionItem
-): Selection | null {
-  const key = selectionItemKey(item);
-  const items = selectionItems(current);
-  const hasItem = items.some((existing) => selectionItemKey(existing) === key);
-  return normalizeSelection(
-    hasItem
-      ? items.filter((existing) => selectionItemKey(existing) !== key)
-      : [...items, item]
-  );
 }
 
 function nextViewId(views: FlowView[]) {
@@ -586,89 +508,6 @@ export function Editor({ initial }: Props) {
     [commit]
   );
 
-  const moveSelection = useCallback(
-    (items: MultiSelectionItem[], dCol: number, dRow: number) => {
-      if (!dCol && !dRow) return;
-      const d = docRef.current;
-      const pos = layoutPositions(d);
-      const groupIds = new Set(
-        items.filter((item) => item.kind === "group").map((item) => item.id)
-      );
-      const carried = new Set(
-        items.filter((item) => item.kind === "step").map((item) => item.id)
-      );
-
-      for (const group of d.groups ?? []) {
-        if (!groupIds.has(group.id)) continue;
-        for (const id of group.steps) carried.add(id);
-      }
-      if (carried.size === 0 && groupIds.size === 0) return;
-
-      for (const sid of carried) {
-        const p = pos.get(sid);
-        if (!p) continue;
-        const col = p.col + dCol;
-        const row = p.row + dRow;
-        if (
-          col < GRID_LIMITS.minCol ||
-          col > GRID_LIMITS.maxCol ||
-          row < GRID_LIMITS.minRow ||
-          row > GRID_LIMITS.maxRow
-        )
-          return;
-        for (const [oid, op] of pos)
-          if (!carried.has(oid) && op.col === col && op.row === row) return;
-      }
-
-      const otherRects = (d.groups ?? [])
-        .filter((group) => !groupIds.has(group.id))
-        .map((group) => groupCellRect(group, pos))
-        .filter((rect): rect is CellRect => !!rect);
-      for (const group of d.groups ?? []) {
-        if (!groupIds.has(group.id)) continue;
-        const rect = groupCellRect(group, pos);
-        if (!rect) continue;
-        const shifted = {
-          minC: rect.minC + dCol,
-          maxC: rect.maxC + dCol,
-          minR: rect.minR + dRow,
-          maxR: rect.maxR + dRow,
-        };
-        if (
-          shifted.minC < GRID_LIMITS.minCol ||
-          shifted.maxC > GRID_LIMITS.maxCol ||
-          shifted.minR < GRID_LIMITS.minRow ||
-          shifted.maxR > GRID_LIMITS.maxRow ||
-          otherRects.some((other) => rectsOverlap(shifted, other))
-        )
-          return;
-      }
-
-      commit({
-        ...d,
-        steps: d.steps.map((step) => {
-          if (!carried.has(step.id)) return step;
-          const p = pos.get(step.id);
-          if (!p) return step;
-          return { ...step, grid: { col: p.col + dCol, row: p.row + dRow } };
-        }),
-        groups: d.groups?.map((group) =>
-          groupIds.has(group.id) && group.grid
-            ? {
-                ...group,
-                grid: {
-                  ...group.grid,
-                  col: group.grid.col + dCol,
-                  row: group.grid.row + dRow,
-                },
-              }
-            : group
-        ),
-      });
-    },
-    [commit]
-  );
-
   const resizeGroup = useCallback(
     (id: string, grid: { col: number; row: number; cols: number; rows: number }) => {
       const d = docRef.current;
@@ -879,65 +718,20 @@ export function Editor({ initial }: Props) {
     [updateStep, commit]
   );
 
-  const deleteSelection = useCallback(() => {
-    const sel = selection;
-    if (!sel) return;
-    if (sel.kind === "edge") {
-      deleteEdge(sel.ref);
-      return;
-    }
-    if (sel.kind === "step") {
-      deleteStep(sel.id);
-      return;
-    }
-
-    const d = docRef.current;
-    const items = selectionItems(sel);
-    const removedGroups = new Set(
-      items.filter((item) => item.kind === "group").map((item) => item.id)
-    );
-    const removedSteps = new Set(
-      items.filter((item) => item.kind === "step").map((item) => item.id)
-    );
-
-    if (removedSteps.size >= d.steps.length) {
-      const keep = d.steps.find((step) => removedSteps.has(step.id));
-      if (keep) removedSteps.delete(keep.id);
-    }
-
-    const steps = d.steps
-      .filter((step) => !removedSteps.has(step.id))
-      .map((step) => {
-        const then =
-          step.then && removedSteps.has(step.then) ? undefined : step.then;
-        const branches = step.branches?.filter(
-          (branch) => !removedSteps.has(branch.to)
-        );
-        return {
-          ...step,
-          then,
-          branches: branches?.length ? branches : undefined,
-        };
-      });
-
-    const groups = d.groups
-      ?.filter((group) => !removedGroups.has(group.id))
-      .map((group) => ({
-        ...group,
-        steps: group.steps.filter((id) => !removedSteps.has(id)),
-      }))
-      .filter((group) => group.steps.length > 0 || group.grid);
-
-    commit({
-      ...d,
-      steps,
-      loops: d.loops?.filter(
-        (loop) => !removedSteps.has(loop.from) && !removedSteps.has(loop.to)
-      ),
-      groups: groups?.length ? groups : undefined,
-    });
-    setSelection(null);
-  }, [commit, deleteEdge, deleteStep, selection]);
+  const {
+    deleteSelection,
+    duplicateSelection,
+    groupSelection,
+    moveSelection,
+  } = useSelectionMutations({
+    docRef,
+    selection,
+    setSelection,
+    commit,
+    focusCell,
+    deleteStep,
+    deleteEdge,
+  });
 
   const updateEdgeLabel = useCallback(
     (ref: EdgeRef, label: string) => {
@@ -1028,6 +822,8 @@ export function Editor({ initial }: Props) {
       updateStep,
       deleteStep,
       deleteSelection,
+      duplicateSelection,
+      groupSelection,
       startConnect: (id) => setConnectFrom(id),
       deleteEdge,
       updateEdgeLabel,
@@ -1085,6 +881,8 @@ export function Editor({ initial }: Props) {
       updateStep,
       deleteStep,
       deleteSelection,
+      duplicateSelection,
+      groupSelection,
       deleteEdge,
       updateEdgeLabel,
       updateEdgeStyle,

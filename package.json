@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
+    "check:geometry": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-geometry.ts",
     "typecheck": "tsc --noEmit",
     "build": "next build",
     "start": "next start"

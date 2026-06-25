@@ -22,9 +22,7 @@ import {
   NODE_W,
   type CellRect,
   type EdgeRef,
-  type MultiSelectionItem,
   type Pos,
-  type Selection,
   cellInRect,
   edgeKey,
   groupCellRect,
@@ -32,6 +30,12 @@ import {
   rectsOverlap,
   routeEdges,
 } from "@/lib/graph";
+import {
+  normalizeSelection,
+  selectionItems,
+  type MultiSelectionItem,
+  type Selection,
+} from "@/lib/selection";
 import { NodeTile } from "./NodeTile";
 
 interface Props {
@@ -74,6 +78,13 @@ interface View {
   k: number;
 }
 
+interface MarqueeRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 const EDGE_STYLE = {
   forward: { stroke: "rgba(232,234,248,0.65)", dash: undefined, marker: "soft" },
   feedback: { stroke: "rgba(238,194,122,1)", dash: "5 5", marker: "amber" },
@@ -87,14 +98,6 @@ const LINE_DASH = {
 } as const;
 
 const markerId = (color: string) => `tip-c-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
-
-function selectionItems(sel: Selection | null): MultiSelectionItem[] {
-  if (!sel) return [];
-  if (sel.kind === "step" || sel.kind === "group")
-    return [{ kind: sel.kind, id: sel.id }];
-  if (sel.kind === "multi") return sel.items;
-  return [];
-}
 
 export function Canvas({
   doc,
@@ -146,6 +149,7 @@ export function Canvas({
     rows: number;
   } | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const panRef = useRef<{
     px: number;
     py: number;
@@ -157,6 +161,14 @@ export function Canvas({
     id: string;
     offX: number;
     offY: number;
+    moved: boolean;
+    additive: boolean;
+  } | null>(null);
+  const marqueeRef = useRef<{
+    sx: number;
+    sy: number;
+    x: number;
+    y: number;
     moved: boolean;
     additive: boolean;
   } | null>(null);
@@ -373,9 +385,30 @@ export function Canvas({
     });
   };
 
-  // background pan
+  const marqueeRect = (sx: number, sy: number, x: number, y: number) => ({
+    left: Math.min(sx, x),
+    top: Math.min(sy, y),
+    width: Math.abs(x - sx),
+    height: Math.abs(y - sy),
+  });
+
+  // background pan, or Shift-drag marquee selection
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    if (e.shiftKey && !connectFrom) {
+      const w = toWorld(e.clientX, e.clientY);
+      marqueeRef.current = {
+        sx: w.x,
+        sy: w.y,
+        x: w.x,
+        y: w.y,
+        moved: false,
+        additive: e.ctrlKey || e.metaKey,
+      };
+      setMarquee(null);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      return;
+    }
     panRef.current = {
       px: e.clientX,
       py: e.clientY,
@@ -388,6 +421,22 @@ export function Canvas({
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (connectFrom) setCursor(toWorld(e.clientX, e.clientY));
+    const marqueeDrag = marqueeRef.current;
+    if (marqueeDrag) {
+      const wp = toWorld(e.clientX, e.clientY);
+      marqueeDrag.x = wp.x;
+      marqueeDrag.y = wp.y;
+      if (
+        !marqueeDrag.moved &&
+        Math.abs(wp.x - marqueeDrag.sx) + Math.abs(wp.y - marqueeDrag.sy) < 8
+      )
+        return;
+      marqueeDrag.moved = true;
+      setMarquee(
+        marqueeRect(marqueeDrag.sx, marqueeDrag.sy, marqueeDrag.x, marqueeDrag.y)
+      );
+      return;
+    }
     const pan = panRef.current;
     if (pan) {
       const dx = e.clientX - pan.px;
@@ -401,6 +450,30 @@ export function Canvas({
   };
 
   const onPointerUp = () => {
+    const marqueeDrag = marqueeRef.current;
+    marqueeRef.current = null;
+    if (marqueeDrag) {
+      setMarquee(null);
+      if (!marqueeDrag.moved) {
+        if (!marqueeDrag.additive) onClearSelection();
+        return;
+      }
+      const picked = marqueeItems(
+        marqueeRect(
+          marqueeDrag.sx,
+          marqueeDrag.sy,
+          marqueeDrag.x,
+          marqueeDrag.y
+        )
+      );
+      const next = normalizeSelection(
+        marqueeDrag.additive ? [...selectedItems, ...picked] : picked
+      );
+      if (next) onSelect(next);
+      else if (!marqueeDrag.additive) onClearSelection();
+      return;
+    }
+
     const pan = panRef.current;
     panRef.current = null;
     if (pan && !pan.moved) {
@@ -652,6 +725,56 @@ export function Canvas({
     groupResize,
     groupColorMap,
   ]);
+
+  const rectIntersects = (
+    a: MarqueeRect,
+    b: { left: number; top: number; width: number; height: number }
+  ) =>
+    a.left < b.left + b.width &&
+    b.left < a.left + a.width &&
+    a.top < b.top + b.height &&
+    b.top < a.top + a.height;
+
+  const rectContains = (
+    a: MarqueeRect,
+    b: { left: number; top: number; width: number; height: number }
+  ) =>
+    b.left >= a.left &&
+    b.left + b.width <= a.left + a.width &&
+    b.top >= a.top &&
+    b.top + b.height <= a.top + a.height;
+
+  function marqueeItems(rect: MarqueeRect): MultiSelectionItem[] {
+    const items: MultiSelectionItem[] = [];
+    for (const step of doc.steps) {
+      const p = positions.get(step.id);
+      if (!p) continue;
+      if (
+        rectIntersects(rect, {
+          left: p.col * CELL_W + GX,
+          top: p.row * CELL_H + GY,
+          width: NODE_W,
+          height: NODE_H,
+        })
+      ) {
+        items.push({ kind: "step", id: step.id });
+      }
+    }
+
+    for (const group of groupRects) {
+      if (
+        rectContains(rect, {
+          left: group.left,
+          top: group.top,
+          width: group.width,
+          height: group.height,
+        })
+      ) {
+        items.push({ kind: "group", id: group.id });
+      }
+    }
+    return items;
+  }
 
   // group dragging — moves every member tile by a cell delta
   const groupDragRef = useRef<{
@@ -994,7 +1117,11 @@ export function Canvas({
       onPointerUp={onPointerUp}
       onContextMenu={onContextMenu}
       className={`anim-canvas relative h-full w-full overflow-hidden ${
-        panRef.current?.moved ? "cursor-grabbing" : "cursor-grab"
+        marquee
+          ? "cursor-crosshair"
+          : panRef.current?.moved
+            ? "cursor-grabbing"
+            : "cursor-grab"
       } ${connectFrom ? "cursor-crosshair" : ""}`}
       style={{ touchAction: "none" }}
     >
@@ -1014,7 +1141,7 @@ export function Canvas({
             top: GRID_LIMITS.minRow * CELL_H,
             width: (GRID_LIMITS.maxCol - GRID_LIMITS.minCol + 1) * CELL_W,
             height: (GRID_LIMITS.maxRow - GRID_LIMITS.minRow + 1) * CELL_H,
-            opacity: drag || multiDrag ? 1 : 0.6,
+            opacity: drag || multiDrag || marquee ? 1 : 0.6,
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
               `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
             )}")`,
@@ -1085,6 +1212,20 @@ export function Canvas({
               top: dragCell.row * CELL_H + GY,
               width: NODE_W,
               height: NODE_H,
+            }}
+          />
+        )}
+
+        {/* marquee selection */}
+        {marquee && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute z-50 rounded-lg border border-accent/80 bg-accent/15 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset]"
+            style={{
+              left: marquee.left,
+              top: marquee.top,
+              width: marquee.width,
+              height: marquee.height,
             }}
           />
         )}
