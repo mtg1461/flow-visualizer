@@ -13,6 +13,7 @@ import {
   Wand2,
 } from "lucide-react";
 import type { FileSyncStatus } from "./ConnectionScreen";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 
 interface ViewOption {
   id: string;
@@ -88,7 +89,7 @@ export function Toolbar({
   }, [open]);
 
   return (
-    <header className="anim-toolbar material-bar z-40 flex h-12 shrink-0 items-center gap-3 border-b border-white/15 px-3.5 backdrop-blur-md">
+    <header className="anim-toolbar material-bar z-40 flex h-12 shrink-0 items-center gap-3 border-b border-line px-3.5 backdrop-blur-md">
       <div ref={switcherRef} className="relative">
         <button
           type="button"
@@ -107,7 +108,7 @@ export function Toolbar({
           />
         </button>
         {open && (
-          <div className="anim-pop material-panel absolute left-0 top-10 z-50 w-[340px] rounded-xl border border-line-strong p-1.5 shadow-2xl shadow-black/55">
+          <div className="anim-pop material-panel absolute left-0 top-10 z-50 w-[340px] rounded-xl border border-line-strong p-1.5">
             <div className="mb-1 flex items-center justify-between border-b border-line px-2 py-1.5">
               <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-faint">
                 Views
@@ -120,7 +121,7 @@ export function Toolbar({
                   onAddView();
                   setOpen(false);
                 }}
-                className="flex size-7 cursor-pointer items-center justify-center rounded-md border border-accent/70 bg-accent text-bg shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0"
+                className="flex size-7 cursor-pointer items-center justify-center rounded-md border border-accent/70 bg-accent text-on-accent shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0"
               >
                 <Plus size={15} strokeWidth={2.7} />
               </button>
@@ -140,7 +141,7 @@ export function Toolbar({
                     className={`flex w-full cursor-pointer items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-[background-color,color,transform] duration-150 hover:-translate-y-px ${
                       selected
                         ? "bg-accent/20 text-text shadow-[inset_0_0_0_1px_rgba(155,155,255,0.16)]"
-                        : "text-mute hover:bg-white/10 hover:text-text"
+                        : "text-mute hover:bg-well hover:text-text"
                     }`}
                   >
                     <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-accent">
@@ -166,7 +167,7 @@ export function Toolbar({
           </div>
         )}
       </div>
-      <div className="flex min-w-0 max-w-[360px] items-center gap-2 rounded-lg border border-white/15 bg-black/25 px-2.5 py-1.5 shadow-inner shadow-black/35">
+      <div className="theme-inset flex min-w-0 max-w-[360px] items-center gap-2 rounded-lg border border-line px-2.5 py-1.5">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
             status === "error"
@@ -194,6 +195,7 @@ export function Toolbar({
         Disconnect
       </button>
       <span className="flex-1" />
+      <ThemeSwitcher />
       <button
         type="button"
         title="Undo (Ctrl+Z)"
@@ -230,7 +232,7 @@ export function Toolbar({
         type="button"
         title="Re-run the automatic layout"
         onClick={onTidy}
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/70 bg-accent px-3 text-[12.5px] font-semibold text-bg shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0"
+        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-accent/70 bg-accent px-3 text-[12.5px] font-semibold text-on-accent shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-accent hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0"
       >
         <Wand2 size={13} strokeWidth={2.7} />
         Tidy

@@ -1,8 +1,9 @@
 "use client";
 
 import type { Step } from "@/lib/types";
-import { KIND_META, withAlpha } from "@/lib/meta";
+import { kindMeta, resolveGraphColor, withAlpha } from "@/lib/meta";
 import { NODE_H, NODE_W } from "@/lib/graph";
+import { useTheme } from "@/hooks/useTheme";
 
 interface Props {
   step: Step;
@@ -33,8 +34,18 @@ export function NodeTile({
   onContextMenu,
   onPortClick,
 }: Props) {
-  const kind = KIND_META[step.kind ?? "process"];
-  const accent = step.color ?? kind.color;
+  const { resolvedTheme } = useTheme();
+  const kind = kindMeta(step.kind ?? "process", resolvedTheme);
+  const accent = step.color
+    ? resolveGraphColor(step.color, resolvedTheme)
+    : kind.color;
+  const connectColor = resolveGraphColor("#7fd6c2", resolvedTheme);
+  const actorDot = actorColor ?? resolveGraphColor("#9b9bff", resolvedTheme);
+  const lightMode = resolvedTheme === "light";
+  const bodyTint = lightMode ? "08" : "0d";
+  const headerTintTop = lightMode ? "36" : "22";
+  const headerTintBottom = lightMode ? "20" : "10";
+  const headerDivider = lightMode ? "52" : "28";
 
   return (
     <div
@@ -50,20 +61,20 @@ export function NodeTile({
         borderColor: selected
           ? accent
           : connectSource
-            ? "#7fd6c2"
-            : "rgba(255,255,255,0.28)",
+            ? connectColor
+            : "var(--app-node-border)",
         background: `linear-gradient(180deg, ${withAlpha(
           accent,
-          "0d"
-        )} 0%, rgba(43,46,65,0.98) 34%, rgba(27,30,45,0.98) 100%)`,
+          bodyTint
+        )} 0%, var(--app-node-body-hi) 34%, var(--app-node-body-lo) 100%)`,
         boxShadow: `${
           selected
             ? `0 0 0 3px ${withAlpha(accent, "42")}, 0 0 26px ${withAlpha(accent, "20")}, `
             : ""
-        }inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.35)${
+        }inset 0 1px 0 var(--app-inset)${
           dragging
-            ? ", 0 24px 58px rgba(0,0,0,0.72)"
-            : ", 0 12px 34px rgba(0,0,0,0.52)"
+            ? ", 0 24px 58px var(--app-node-drag-shadow)"
+            : ", 0 12px 34px var(--app-node-shadow)"
         }`,
       }}
       className={`group absolute overflow-hidden select-none rounded-lg border hover:border-line-strong ${
@@ -77,25 +88,31 @@ export function NodeTile({
         style={{
           background: `linear-gradient(180deg, ${withAlpha(
             accent,
-            "22"
-          )}, ${withAlpha(accent, "10")})`,
-          borderBottom: `1px solid ${withAlpha(accent, "28")}`,
+            headerTintTop
+          )}, ${withAlpha(accent, headerTintBottom)})`,
+          borderBottom: `1px solid ${withAlpha(accent, headerDivider)}`,
+          boxShadow: lightMode
+            ? `inset 0 1px 0 rgba(255,255,255,0.78), 0 1px 0 ${withAlpha(
+                accent,
+                "10"
+              )}`
+            : "inset 0 1px 0 var(--app-inset)",
         }}
       >
         <span
-          className="text-[10px] font-bold uppercase tracking-[0.15em]"
+          className="text-[10px] font-extrabold uppercase tracking-[0.16em]"
           style={{ color: accent }}
         >
           {kind.label}
         </span>
         <span className="flex-1" />
         {actorName && (
-          <span className="flex min-w-0 items-center gap-1.5 rounded-full border border-white/10 bg-black/20 px-1.5 py-0.5 text-[10.5px] text-[#dfe1ee]">
+          <span className="theme-inset flex min-w-0 items-center gap-1.5 rounded-full border border-line px-1.5 py-0.5 text-[10.5px] text-text">
             <span
               className="size-1.5 shrink-0 rounded-full"
               style={{
-                background: actorColor ?? "#9b9bff",
-                boxShadow: `0 0 8px ${actorColor ?? "#9b9bff"}80`,
+                background: actorDot,
+                boxShadow: `0 0 8px ${actorDot}80`,
               }}
             />
             <span className="truncate">{actorName}</span>
@@ -103,7 +120,7 @@ export function NodeTile({
         )}
       </div>
 
-      <h3 className="line-clamp-2 px-3.5 pt-2.5 text-[13.5px] font-semibold leading-snug text-text drop-shadow-[0_1px_0_rgba(0,0,0,0.45)]">
+      <h3 className="line-clamp-2 px-3.5 pt-2.5 text-[13.5px] font-semibold leading-snug text-text">
         {step.title}
       </h3>
 

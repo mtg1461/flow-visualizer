@@ -1,23 +1,133 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #07080d;
-  --color-surface: #141724;
-  --color-raise: #1d2130;
-  --color-tile: #292d3f;
-  --color-well: #0a0c13;
-  --color-line: rgba(255, 255, 255, 0.14);
-  --color-line-strong: rgba(255, 255, 255, 0.26);
-  --color-text: #f4f4f9;
-  --color-mute: #b4b6c6;
-  --color-faint: #8d8fa1;
-  --color-accent: #9b9bff;
-  --color-teal: #7fd6c2;
-  --color-amber: #eec27a;
-  --color-rose: #ef9cbe;
+  --color-bg: var(--app-bg);
+  --color-surface: var(--app-surface);
+  --color-raise: var(--app-panel);
+  --color-tile: var(--app-tile);
+  --color-well: var(--app-well);
+  --color-line: var(--app-border);
+  --color-line-strong: var(--app-border-strong);
+  --color-text: var(--app-text);
+  --color-mute: var(--app-muted);
+  --color-faint: var(--app-faint);
+  --color-accent: var(--app-accent);
+  --color-teal: var(--app-teal);
+  --color-amber: var(--app-amber);
+  --color-rose: var(--app-rose);
+  --color-on-accent: var(--app-on-accent);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-instrument), Georgia, serif;
+}
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #f5f7fb;
+  --app-surface: #ffffff;
+  --app-panel: #f8faff;
+  --app-tile: #ffffff;
+  --app-well: #edf1f8;
+  --app-control: #ffffff;
+  --app-control-hover: #f2f5fb;
+  --app-text: #171926;
+  --app-muted: #596073;
+  --app-faint: #7a8295;
+  --app-border: rgba(32, 40, 64, 0.14);
+  --app-border-strong: rgba(32, 40, 64, 0.24);
+  --app-accent: #6264df;
+  --app-teal: #0c856f;
+  --app-amber: #a36c08;
+  --app-rose: #c4477e;
+  --app-overlay: rgba(10, 14, 25, 0.42);
+  --app-hover: rgba(32, 40, 64, 0.07);
+  --app-subtle: rgba(32, 40, 64, 0.045);
+  --app-inset: rgba(255, 255, 255, 0.82);
+  --app-shadow-soft: rgba(35, 45, 70, 0.18);
+  --app-shadow-strong: rgba(35, 45, 70, 0.28);
+  --app-shell-top: rgba(255, 255, 255, 0.84);
+  --app-shell-stop: rgba(245, 247, 251, 0);
+  --app-shell-from: #f8faff;
+  --app-shell-mid: #eef3fb;
+  --app-shell-to: #f5f7fb;
+  --app-canvas-glow: rgba(98, 100, 223, 0.07);
+  --app-canvas-from: #f7f9fd;
+  --app-canvas-mid: #eef3fa;
+  --app-canvas-to: #f6f8fc;
+  --app-grid-line: rgba(36, 46, 74, 0.075);
+  --app-slot-fill: rgba(36, 46, 74, 0.022);
+  --app-slot-stroke: rgba(36, 46, 74, 0.18);
+  --app-panel-hi: rgba(255, 255, 255, 0.98);
+  --app-panel-lo: rgba(241, 245, 252, 0.98);
+  --app-bar-hi: rgba(255, 255, 255, 0.96);
+  --app-bar-lo: rgba(235, 240, 249, 0.96);
+  --app-control-hi: rgba(255, 255, 255, 0.98);
+  --app-control-lo: rgba(238, 243, 251, 0.98);
+  --app-control-hover-hi: rgba(255, 255, 255, 1);
+  --app-control-hover-lo: rgba(230, 237, 249, 1);
+  --app-node-body-hi: rgba(255, 255, 255, 0.98);
+  --app-node-body-lo: rgba(240, 244, 252, 0.98);
+  --app-node-border: rgba(32, 40, 64, 0.24);
+  --app-node-shadow: rgba(34, 46, 76, 0.22);
+  --app-node-drag-shadow: rgba(34, 46, 76, 0.32);
+  --app-on-accent: #ffffff;
+  --app-radius-sm: 6px;
+  --app-radius-md: 8px;
+  --app-radius-lg: 12px;
+  --app-radius-xl: 16px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #07080d;
+  --app-surface: #141724;
+  --app-panel: #1d2130;
+  --app-tile: #292d3f;
+  --app-well: #0a0c13;
+  --app-control: #1d2130;
+  --app-control-hover: #292d3f;
+  --app-text: #f4f4f9;
+  --app-muted: #b4b6c6;
+  --app-faint: #8d8fa1;
+  --app-border: rgba(255, 255, 255, 0.14);
+  --app-border-strong: rgba(255, 255, 255, 0.26);
+  --app-accent: #9b9bff;
+  --app-teal: #7fd6c2;
+  --app-amber: #eec27a;
+  --app-rose: #ef9cbe;
+  --app-overlay: rgba(0, 0, 0, 0.6);
+  --app-hover: rgba(255, 255, 255, 0.1);
+  --app-subtle: rgba(255, 255, 255, 0.055);
+  --app-inset: rgba(255, 255, 255, 0.1);
+  --app-shadow-soft: rgba(0, 0, 0, 0.28);
+  --app-shadow-strong: rgba(0, 0, 0, 0.55);
+  --app-shell-top: rgba(20, 23, 36, 0.72);
+  --app-shell-stop: rgba(7, 8, 13, 0);
+  --app-shell-from: #080911;
+  --app-shell-mid: #0d111d;
+  --app-shell-to: #07080d;
+  --app-canvas-glow: rgba(255, 255, 255, 0.035);
+  --app-canvas-from: #080911;
+  --app-canvas-mid: #0b0f19;
+  --app-canvas-to: #07080d;
+  --app-grid-line: rgba(255, 255, 255, 0.035);
+  --app-slot-fill: rgba(255, 255, 255, 0.012);
+  --app-slot-stroke: rgba(255, 255, 255, 0.26);
+  --app-panel-hi: rgba(37, 41, 58, 0.98);
+  --app-panel-lo: rgba(22, 25, 38, 0.98);
+  --app-bar-hi: rgba(35, 39, 56, 0.96);
+  --app-bar-lo: rgba(17, 20, 31, 0.96);
+  --app-control-hi: rgba(48, 52, 72, 0.95);
+  --app-control-lo: rgba(30, 34, 50, 0.95);
+  --app-control-hover-hi: rgba(58, 63, 86, 0.98);
+  --app-control-hover-lo: rgba(36, 40, 58, 0.98);
+  --app-node-body-hi: rgba(43, 46, 65, 0.98);
+  --app-node-body-lo: rgba(27, 30, 45, 0.98);
+  --app-node-border: rgba(255, 255, 255, 0.28);
+  --app-node-shadow: rgba(0, 0, 0, 0.52);
+  --app-node-drag-shadow: rgba(0, 0, 0, 0.72);
+  --app-on-accent: #07080d;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -102,14 +212,24 @@ body {
 
 .app-shell {
   background:
-    linear-gradient(180deg, rgba(20, 23, 36, 0.72), rgba(7, 8, 13, 0) 220px),
-    linear-gradient(135deg, #080911 0%, #0d111d 42%, #07080d 100%);
+    linear-gradient(180deg, var(--app-shell-top), var(--app-shell-stop) 220px),
+    linear-gradient(
+      135deg,
+      var(--app-shell-from) 0%,
+      var(--app-shell-mid) 42%,
+      var(--app-shell-to) 100%
+    );
 }
 
 .canvas-stage {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 20%),
-    linear-gradient(135deg, #080911 0%, #0b0f19 48%, #07080d 100%);
+    linear-gradient(180deg, var(--app-canvas-glow), transparent 20%),
+    linear-gradient(
+      135deg,
+      var(--app-canvas-from) 0%,
+      var(--app-canvas-mid) 48%,
+      var(--app-canvas-to) 100%
+    );
 }
 
 .canvas-stage::before {
@@ -118,8 +238,8 @@ body {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
   background-size: 72px 72px;
   opacity: 0.38;
   mask-image: linear-gradient(180deg, black, transparent 88%);
@@ -127,48 +247,85 @@ body {
 
 .material-panel {
   background:
-    linear-gradient(180deg, rgba(37, 41, 58, 0.98), rgba(22, 25, 38, 0.98)),
-    var(--color-raise);
+    linear-gradient(180deg, var(--app-panel-hi), var(--app-panel-lo)),
+    var(--app-panel);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 24px 70px rgba(0, 0, 0, 0.5);
+    inset 0 1px 0 var(--app-inset),
+    0 24px 70px var(--app-shadow-strong);
 }
 
 .material-bar {
   background:
-    linear-gradient(180deg, rgba(35, 39, 56, 0.96), rgba(17, 20, 31, 0.96)),
-    var(--color-raise);
+    linear-gradient(180deg, var(--app-bar-hi), var(--app-bar-lo)),
+    var(--app-panel);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 12px 32px rgba(0, 0, 0, 0.42);
+    inset 0 1px 0 var(--app-inset),
+    0 12px 32px var(--app-shadow-soft);
 }
 
 .material-control {
   background:
-    linear-gradient(180deg, rgba(48, 52, 72, 0.95), rgba(30, 34, 50, 0.95)),
-    var(--color-raise);
+    linear-gradient(180deg, var(--app-control-hi), var(--app-control-lo)),
+    var(--app-control);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.11),
-    0 8px 20px rgba(0, 0, 0, 0.28);
+    inset 0 1px 0 var(--app-inset),
+    0 8px 20px var(--app-shadow-soft);
 }
 
 .material-control:hover {
   background:
-    linear-gradient(180deg, rgba(58, 63, 86, 0.98), rgba(36, 40, 58, 0.98)),
-    var(--color-tile);
+    linear-gradient(
+      180deg,
+      var(--app-control-hover-hi),
+      var(--app-control-hover-lo)
+    ),
+    var(--app-control-hover);
+}
+
+.theme-overlay {
+  background: var(--app-overlay);
+}
+
+.theme-hover:hover {
+  background: var(--app-hover);
+}
+
+.theme-subtle {
+  background: var(--app-subtle);
+}
+
+.theme-inset {
+  background: var(--app-subtle);
+  box-shadow: inset 0 1px 0 var(--app-inset);
+}
+
+.theme-border {
+  border-color: var(--app-border);
+}
+
+.theme-border-strong {
+  border-color: var(--app-border-strong);
+}
+
+.theme-shadow-soft {
+  box-shadow: 0 12px 32px var(--app-shadow-soft);
+}
+
+.theme-shadow-strong {
+  box-shadow: 0 24px 70px var(--app-shadow-strong);
 }
 
 ::selection {
-  background: rgba(143, 143, 252, 0.28);
+  background: color-mix(in srgb, var(--app-accent) 28%, transparent);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: var(--app-border) transparent;
 }
 
 :focus-visible {
-  outline: 2px solid rgba(143, 143, 252, 0.7);
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 70%, transparent);
   outline-offset: 2px;
   border-radius: 4px;
 }

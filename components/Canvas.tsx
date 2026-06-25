@@ -10,7 +10,14 @@ import {
 } from "react";
 import { GripVertical, Maximize2, Minus, Plus } from "lucide-react";
 import type { Explanation } from "@/lib/types";
-import { actorColors, groupColors, withAlpha } from "@/lib/meta";
+import {
+  actorColors,
+  edgeThemeColors,
+  groupColors,
+  resolveGraphColor,
+  withAlpha,
+} from "@/lib/meta";
+import { useTheme } from "@/hooks/useTheme";
 import type { MenuTarget } from "./ContextMenu";
 import {
   CELL_H,
@@ -85,12 +92,6 @@ interface MarqueeRect {
   height: number;
 }
 
-const EDGE_STYLE = {
-  forward: { stroke: "rgba(232,234,248,0.65)", dash: undefined, marker: "soft" },
-  feedback: { stroke: "rgba(238,194,122,1)", dash: "5 5", marker: "amber" },
-  loop: { stroke: "rgba(165,165,255,1)", dash: "2.5 6", marker: "accent" },
-} as const;
-
 const LINE_DASH = {
   solid: undefined,
   dashed: "5 5",
@@ -118,6 +119,7 @@ export function Canvas({
   onCancelConnect,
   onMenu,
 }: Props) {
+  const { resolvedTheme } = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 80, y: 60, k: 1 });
   const [drag, setDrag] = useState<{ id: string; wx: number; wy: number } | null>(
@@ -174,10 +176,34 @@ export function Canvas({
   } | null>(null);
 
   const colors = useMemo(
-    () => actorColors(doc, actorColorScope),
-    [doc, actorColorScope]
+    () => actorColors(doc, actorColorScope, resolvedTheme),
+    [doc, actorColorScope, resolvedTheme]
   );
-  const groupColorMap = useMemo(() => groupColors(doc), [doc]);
+  const groupColorMap = useMemo(
+    () => groupColors(doc, resolvedTheme),
+    [doc, resolvedTheme]
+  );
+  const edgeColors = useMemo(
+    () => edgeThemeColors(resolvedTheme),
+    [resolvedTheme]
+  );
+  const edgeStyle = useMemo(
+    () =>
+      ({
+        forward: {
+          stroke: edgeColors.forward,
+          dash: undefined,
+          marker: "soft",
+        },
+        feedback: {
+          stroke: edgeColors.feedback,
+          dash: "5 5",
+          marker: "amber",
+        },
+        loop: { stroke: edgeColors.loop, dash: "2.5 6", marker: "accent" },
+      }) as const,
+    [edgeColors]
+  );
   const actorsById = useMemo(
     () => new Map((doc.actors ?? []).map((p) => [p.id, p])),
     [doc]
@@ -269,8 +295,16 @@ export function Canvas({
   );
 
   const customColors = useMemo(
-    () => [...new Set(edges.map((e) => e.color).filter((c): c is string => !!c))],
-    [edges]
+    () => [
+      ...new Set(
+        edges
+          .map((e) =>
+            e.color ? resolveGraphColor(e.color, resolvedTheme) : undefined
+          )
+          .filter((c): c is string => !!c)
+      ),
+    ],
+    [edges, resolvedTheme]
   );
 
   const fit = useCallback(() => {
@@ -1108,6 +1142,14 @@ export function Canvas({
     selection?.kind === "edge" ? edgeKey(selection.ref) : null;
 
   const connectSource = connectFrom ? positions.get(connectFrom) : null;
+  const slotFill =
+    resolvedTheme === "light"
+      ? "rgba(36,46,74,0.022)"
+      : "rgba(255,255,255,0.012)";
+  const slotStroke =
+    resolvedTheme === "light"
+      ? "rgba(36,46,74,0.18)"
+      : "rgba(255,255,255,0.26)";
 
   return (
     <div
@@ -1143,7 +1185,7 @@ export function Canvas({
             height: (GRID_LIMITS.maxRow - GRID_LIMITS.minRow + 1) * CELL_H,
             opacity: drag || multiDrag || marquee ? 1 : 0.66,
             backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
-              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='rgba(255,255,255,0.012)' stroke='rgba(255,255,255,0.26)' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
+              `<svg xmlns='http://www.w3.org/2000/svg' width='${CELL_W}' height='${CELL_H}'><rect x='${GX}' y='${GY}' width='${NODE_W}' height='${NODE_H}' rx='10' fill='${slotFill}' stroke='${slotStroke}' stroke-width='1.5' stroke-dasharray='6 7'/></svg>`
             )}")`,
             backgroundSize: `${CELL_W}px ${CELL_H}px`,
           }}
@@ -1173,12 +1215,12 @@ export function Canvas({
                   ? "rgba(239,156,190,0.12)"
                   : withAlpha(r.color, "2e"),
                 boxShadow: isSel
-                  ? `0 0 0 3px ${withAlpha(r.color, "47")}, 0 18px 46px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.08)`
-                  : "inset 0 1px 0 rgba(255,255,255,0.07), 0 12px 34px rgba(0,0,0,0.18)",
+                  ? `0 0 0 3px ${withAlpha(r.color, "47")}, 0 18px 46px var(--app-shadow-soft), inset 0 1px 0 var(--app-inset)`
+                  : "inset 0 1px 0 var(--app-inset), 0 12px 34px var(--app-shadow-soft)",
               }}
             >
               <span
-                className="absolute left-2.5 top-2 flex items-center gap-1 rounded-md border border-white/10 py-0.5 pl-1 pr-2 text-[11px] font-bold uppercase tracking-[0.16em] shadow-md shadow-black/25"
+                className="theme-inset absolute left-2.5 top-2 flex items-center gap-1 rounded-md border border-line py-0.5 pl-1 pr-2 text-[11px] font-bold uppercase tracking-[0.16em]"
                 style={{
                   color: r.color,
                   background: withAlpha(r.color, "47"),
@@ -1240,10 +1282,10 @@ export function Canvas({
           <defs>
             {(
               [
-                ["soft", "rgba(232,234,248,0.9)"],
-                ["amber", "rgba(238,194,122,1)"],
-                ["accent", "rgba(165,165,255,1)"],
-                ["teal", "rgba(127,214,194,1)"],
+                ["soft", edgeColors.softMarker],
+                ["amber", edgeColors.feedback],
+                ["accent", edgeColors.loop],
+                ["teal", edgeColors.teal],
               ] as const
             ).map(([name, color]) => (
               <marker
@@ -1289,14 +1331,17 @@ export function Canvas({
           {edges.map((edge) => {
             const base =
               edge.kind === "loop"
-                ? EDGE_STYLE.loop
+                ? edgeStyle.loop
                 : edge.backward
-                  ? EDGE_STYLE.feedback
-                  : EDGE_STYLE.forward;
+                  ? edgeStyle.feedback
+                  : edgeStyle.forward;
+            const customColor = edge.color
+              ? resolveGraphColor(edge.color, resolvedTheme)
+              : undefined;
             const style = {
-              stroke: edge.color ?? base.stroke,
+              stroke: customColor ?? base.stroke,
               dash: edge.line ? LINE_DASH[edge.line] : base.dash,
-              marker: edge.color ? markerId(edge.color) : `tip-${base.marker}`,
+              marker: customColor ? markerId(customColor) : `tip-${base.marker}`,
             };
             const isSel = selectedEdgeKey === edge.key;
             return (
@@ -1347,7 +1392,7 @@ export function Canvas({
                 connectSource.row * CELL_H + GY + NODE_H + 70
               }, ${cursor.x} ${cursor.y - 70}, ${cursor.x} ${cursor.y}`}
               fill="none"
-              stroke="rgba(108,199,178,0.8)"
+                  stroke={withAlpha(edgeColors.teal, "cc")}
               strokeWidth="1.5"
               strokeDasharray="4 4"
               markerEnd="url(#tip-teal)"
@@ -1361,7 +1406,10 @@ export function Canvas({
           .filter((e) => e.label)
           .map((edge) => {
             const isSel = selectedEdgeKey === edge.key;
-            const tone = edge.color
+            const customColor = edge.color
+              ? resolveGraphColor(edge.color, resolvedTheme)
+              : undefined;
+            const tone = customColor
               ? ""
               : edge.kind === "loop"
                 ? "border-accent/50 text-accent"
@@ -1377,16 +1425,16 @@ export function Canvas({
                   e.stopPropagation();
                   onSelect({ kind: "edge", ref: edge.ref });
                 }}
-                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise/95 px-2 py-0.5 text-[11px] font-medium leading-4 shadow-lg shadow-black/50 backdrop-blur-sm transition-[left,top,border-color,color,box-shadow,opacity] duration-200 ease-out ${tone} ${
+                className={`absolute max-w-[170px] -translate-x-1/2 -translate-y-1/2 cursor-pointer truncate rounded-md border bg-raise/95 px-2 py-0.5 text-[11px] font-medium leading-4 backdrop-blur-sm transition-[left,top,border-color,color,box-shadow,opacity] duration-200 ease-out ${tone} ${
                   isSel ? "ring-1 ring-accent/60" : ""
                 }`}
                 style={{
                   left: edge.labelX,
                   top: edge.labelY,
-                  ...(edge.color
+                  ...(customColor
                     ? {
-                        color: edge.color,
-                        borderColor: withAlpha(edge.color, "80"),
+                        color: customColor,
+                        borderColor: withAlpha(customColor, "80"),
                       }
                     : {}),
                 }}
@@ -1438,19 +1486,19 @@ export function Canvas({
 
       {/* connect-mode hint */}
       {connectFrom && (
-        <div className="anim-pop material-panel pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/45 px-3.5 py-1.5 text-[12px] font-medium text-teal shadow-lg shadow-black/40">
+        <div className="anim-pop material-panel pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-teal/45 px-3.5 py-1.5 text-[12px] font-medium text-teal">
           Click a tile to connect — Esc to cancel
         </div>
       )}
 
       {/* zoom controls */}
-      <div className="anim-pop material-panel absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-white/20 p-1 shadow-lg shadow-black/45">
+      <div className="anim-pop material-panel absolute bottom-4 right-4 flex items-center gap-0.5 rounded-lg border border-line-strong p-1">
         <button
           type="button"
           aria-label="Zoom out"
           onClick={() => zoomBy(1 / 1.25)}
           onPointerDown={(e) => e.stopPropagation()}
-          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-white/10 hover:text-text"
+          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-well hover:text-text"
         >
           <Minus size={13} />
         </button>
@@ -1462,7 +1510,7 @@ export function Canvas({
           aria-label="Zoom in"
           onClick={() => zoomBy(1.25)}
           onPointerDown={(e) => e.stopPropagation()}
-          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-white/10 hover:text-text"
+          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-well hover:text-text"
         >
           <Plus size={13} />
         </button>
@@ -1474,14 +1522,14 @@ export function Canvas({
             fit();
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-white/10 hover:text-text"
+          className="cursor-pointer rounded-md p-1.5 text-mute transition-colors hover:bg-well hover:text-text"
         >
           <Maximize2 size={13} />
         </button>
       </div>
 
       {/* hint */}
-      <div className="pointer-events-none absolute bottom-5 left-4 hidden rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[11.5px] font-medium text-mute shadow-lg shadow-black/30 backdrop-blur-sm md:block">
+      <div className="theme-inset pointer-events-none absolute bottom-5 left-4 hidden rounded-full border border-line px-3 py-1.5 text-[11.5px] font-medium text-mute backdrop-blur-sm md:block">
         Right-click the graph for more options
       </div>
     </div>

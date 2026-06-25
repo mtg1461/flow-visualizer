@@ -35,7 +35,6 @@ import { useEditorHistory } from "@/hooks/useEditorHistory";
 import { useFileConnection } from "@/hooks/useFileConnection";
 import { useSelectionMutations } from "@/hooks/useSelectionMutations";
 import { LOCAL_FILES_ENABLED } from "@/lib/config";
-import { groupColors } from "@/lib/meta";
 
 interface Props {
   initial: FlowFile;
@@ -170,7 +169,6 @@ export function Editor({ initial }: Props) {
   });
 
   const positions = useMemo(() => layoutPositions(doc), [doc]);
-  const groupColorMap = useMemo(() => groupColors(doc), [doc]);
   const viewOptions = useMemo(
     () =>
       fileDoc.views.map((view) => ({
@@ -1018,8 +1016,9 @@ export function Editor({ initial }: Props) {
                     (s) => s.id === (menu.target as { id: string }).id
                   )?.color
                 : menu.target.type === "group"
-                  ? (groupColorMap.get((menu.target as { id: string }).id) ??
-                    "#9b9bff")
+                  ? doc.groups?.find(
+                      (g) => g.id === (menu.target as { id: string }).id
+                    )?.color
                   : undefined
             }
             canDelete={doc.steps.length > 1}

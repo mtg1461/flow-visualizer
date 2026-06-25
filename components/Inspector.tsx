@@ -21,9 +21,13 @@ import {
   KIND_META,
   STEP_PALETTE,
   actorColors,
+  graphPalette,
   groupColors,
+  kindMeta,
   withAlpha,
 } from "@/lib/meta";
+import { useTheme } from "@/hooks/useTheme";
+import type { ResolvedTheme } from "@/lib/theme";
 import { type EdgeRef } from "@/lib/graph";
 import { type Selection } from "@/lib/selection";
 
@@ -59,10 +63,10 @@ interface Props {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-white/20 bg-black/25 px-2.5 py-1.5 text-[13px] text-text shadow-inner shadow-black/35 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/75 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/20";
+  "w-full rounded-lg border border-line-strong bg-well px-2.5 py-1.5 text-[13px] text-text shadow-inner transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-accent/45 focus:border-accent/75 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20";
 const selectCls = `${inputCls} cursor-pointer appearance-none pr-8`;
 const miniInputCls =
-  "rounded-md border border-white/20 bg-black/25 px-1.5 py-1 text-text shadow-inner shadow-black/30 transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-white/30 focus:border-accent/75 focus:bg-[#11131c] focus:outline-none focus:ring-2 focus:ring-accent/20";
+  "rounded-md border border-line-strong bg-well px-1.5 py-1 text-text shadow-inner transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-faint hover:border-accent/45 focus:border-accent/75 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent/20";
 const labelCls =
   "mb-1.5 mt-3.5 block text-[10.5px] font-medium uppercase tracking-[0.16em] text-mute";
 
@@ -71,6 +75,7 @@ function truncate(s: string, n: number) {
 }
 
 export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
+  const { resolvedTheme } = useTheme();
   const panelKey = selection
     ? selection.kind === "edge"
       ? `${selection.kind}:${JSON.stringify(selection.ref)}`
@@ -80,20 +85,27 @@ export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
     : "doc";
 
   return (
-    <aside className="anim-inspector material-panel absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-white/20 p-4 shadow-2xl shadow-black/55 backdrop-blur-md md:flex">
+    <aside className="anim-inspector material-panel absolute bottom-3 right-3 top-3 z-30 hidden w-[304px] flex-col overflow-y-auto rounded-xl border border-line-strong p-4 backdrop-blur-md md:flex">
       <div key={panelKey} className="anim-panel-change">
         {selection?.kind === "step" ? (
           <StepPanel
             doc={doc}
             step={doc.steps.find((s) => s.id === selection.id)}
+            resolvedTheme={resolvedTheme}
             actions={actions}
           />
         ) : selection?.kind === "edge" ? (
-          <EdgePanel doc={doc} edgeRef={selection.ref} actions={actions} />
+          <EdgePanel
+            doc={doc}
+            edgeRef={selection.ref}
+            resolvedTheme={resolvedTheme}
+            actions={actions}
+          />
         ) : selection?.kind === "group" ? (
           <GroupPanel
             doc={doc}
             group={doc.groups?.find((g) => g.id === selection.id)}
+            resolvedTheme={resolvedTheme}
             actions={actions}
           />
         ) : selection?.kind === "multi" ? (
@@ -102,6 +114,7 @@ export function Inspector({ doc, actorColorScope, selection, actions }: Props) {
           <DocPanel
             doc={doc}
             actorColorScope={actorColorScope}
+            resolvedTheme={resolvedTheme}
             actions={actions}
           />
         )}
@@ -180,7 +193,7 @@ function MultiPanel({
         {steps.slice(0, 5).map((step) => (
           <div
             key={`step:${step.id}`}
-            className="rounded-lg border border-white/15 bg-black/20 px-2.5 py-2 text-[12px] text-text/90 shadow-inner shadow-white/5"
+            className="theme-inset rounded-lg border border-line px-2.5 py-2 text-[12px] text-text/90"
           >
             {truncate(step.title, 32)}
           </div>
@@ -188,7 +201,7 @@ function MultiPanel({
         {groups.slice(0, 4).map((group) => (
           <div
             key={`group:${group.id}`}
-            className="rounded-lg border border-white/15 bg-black/20 px-2.5 py-2 text-[12px] text-text/90 shadow-inner shadow-white/5"
+            className="theme-inset rounded-lg border border-line px-2.5 py-2 text-[12px] text-text/90"
           >
             {truncate(group.label, 32)}
           </div>
@@ -208,16 +221,20 @@ function MultiPanel({
 function StepPanel({
   doc,
   step,
+  resolvedTheme,
   actions,
 }: {
   doc: Explanation;
   step?: Step;
+  resolvedTheme: ResolvedTheme;
   actions: EditorActions;
 }) {
   if (!step) return null;
   const byId = new Map(doc.steps.map((s, i) => [s.id, { i, title: s.title }]));
   const stepIndex = byId.get(step.id)?.i ?? 0;
   const isBackward = (to: string) => (byId.get(to)?.i ?? Infinity) <= stepIndex;
+  const palette = graphPalette(resolvedTheme);
+  const currentKind = kindMeta(step.kind ?? "process", resolvedTheme);
 
   const setBranches = (branches: Branch[]) =>
     actions.updateStep(step.id, {
@@ -274,21 +291,21 @@ function StepPanel({
           className={`size-4.5 cursor-pointer rounded-full border border-dashed border-line-strong transition-transform hover:scale-110 ${
             !step.color ? "ring-1 ring-text/60" : ""
           }`}
-          style={{ background: withAlpha(KIND_META[step.kind ?? "process"].color, "33") }}
+          style={{ background: withAlpha(currentKind.color, "33") }}
         />
-        {STEP_PALETTE.map((c) => (
+        {palette.map((swatch) => (
           <button
-            key={c}
+            key={swatch.value}
             type="button"
-            title={c}
-            aria-label={`Set color ${c}`}
-            onClick={() => actions.updateStep(step.id, { color: c })}
+            title={swatch.value}
+            aria-label={`Set color ${swatch.value}`}
+            onClick={() => actions.updateStep(step.id, { color: swatch.value })}
             className={`size-4.5 cursor-pointer rounded-full transition-transform hover:scale-110 ${
-              step.color === c
+              step.color === swatch.value
                 ? "ring-1 ring-text/70 ring-offset-2 ring-offset-surface"
                 : ""
             }`}
-            style={{ background: c }}
+            style={{ background: swatch.color }}
           />
         ))}
       </div>
@@ -423,10 +440,12 @@ const LINE_OPTIONS: { value: EdgeLine; label: string }[] = [
 function EdgePanel({
   doc,
   edgeRef,
+  resolvedTheme,
   actions,
 }: {
   doc: Explanation;
   edgeRef: EdgeRef;
+  resolvedTheme: ResolvedTheme;
   actions: EditorActions;
 }) {
   const byId = new Map(doc.steps.map((s, i) => [s.id, { i, title: s.title }]));
@@ -467,6 +486,7 @@ function EdgePanel({
     edgeRef.type === "loop" ||
     (byId.get(to)?.i ?? Infinity) <= (byId.get(from)?.i ?? 0);
   const effectiveLine: EdgeLine = line ?? (backward ? "dashed" : "solid");
+  const palette = graphPalette(resolvedTheme);
 
   return (
     <div>
@@ -544,19 +564,21 @@ function EdgePanel({
             !color ? "ring-1 ring-text/60" : ""
           }`}
         />
-        {STEP_PALETTE.map((c) => (
+        {palette.map((swatch) => (
           <button
-            key={c}
+            key={swatch.value}
             type="button"
-            title={c}
-            aria-label={`Set edge color ${c}`}
-            onClick={() => actions.updateEdgeStyle(edgeRef, { color: c })}
+            title={swatch.value}
+            aria-label={`Set edge color ${swatch.value}`}
+            onClick={() =>
+              actions.updateEdgeStyle(edgeRef, { color: swatch.value })
+            }
             className={`size-4.5 cursor-pointer rounded-full transition-transform hover:scale-110 ${
-              color === c
+              color === swatch.value
                 ? "ring-1 ring-text/70 ring-offset-2 ring-offset-raise"
                 : ""
             }`}
-            style={{ background: c }}
+            style={{ background: swatch.color }}
           />
         ))}
       </div>
@@ -581,15 +603,18 @@ function EdgePanel({
 function GroupPanel({
   doc,
   group,
+  resolvedTheme,
   actions,
 }: {
   doc: Explanation;
   group?: Group;
+  resolvedTheme: ResolvedTheme;
   actions: EditorActions;
 }) {
   if (!group) return null;
   const titleOf = new Map(doc.steps.map((s) => [s.id, s.title]));
-  const color = groupColors(doc).get(group.id) ?? "#9b9bff";
+  const color = groupColors(doc, resolvedTheme).get(group.id) ?? "#9b9bff";
+  const palette = graphPalette(resolvedTheme);
 
   return (
     <div>
@@ -619,19 +644,21 @@ function GroupPanel({
 
       <span className={labelCls}>Color</span>
       <div className="flex items-center gap-1.5">
-        {STEP_PALETTE.map((c) => (
+        {palette.map((swatch) => (
           <button
-            key={c}
+            key={swatch.value}
             type="button"
-            title={c}
-            aria-label={`Set group color ${c}`}
-            onClick={() => actions.updateGroup(group.id, { color: c })}
+            title={swatch.value}
+            aria-label={`Set group color ${swatch.value}`}
+            onClick={() =>
+              actions.updateGroup(group.id, { color: swatch.value })
+            }
             className={`size-4.5 cursor-pointer rounded-full transition-transform hover:scale-110 ${
-              color === c
+              group.color === swatch.value
                 ? "ring-1 ring-text/70 ring-offset-2 ring-offset-raise"
                 : ""
             }`}
-            style={{ background: c }}
+            style={{ background: swatch.color }}
           />
         ))}
       </div>
@@ -671,14 +698,16 @@ function GroupPanel({
 function DocPanel({
   doc,
   actorColorScope,
+  resolvedTheme,
   actions,
 }: {
   doc: Explanation;
   actorColorScope: readonly Explanation[];
+  resolvedTheme: ResolvedTheme;
   actions: EditorActions;
 }) {
-  const colors = actorColors(doc, actorColorScope);
-  const groupColorMap = groupColors(doc);
+  const colors = actorColors(doc, actorColorScope, resolvedTheme);
+  const groupColorMap = groupColors(doc, resolvedTheme);
   const actors = doc.actors ?? [];
   const groups = doc.groups ?? [];
 
@@ -724,7 +753,7 @@ function DocPanel({
         {actors.map((p) => (
           <div
             key={p.id}
-            className="rounded-lg border border-white/15 bg-black/20 p-2 shadow-inner shadow-white/5"
+            className="theme-inset rounded-lg border border-line p-2"
           >
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5">
               <span
@@ -763,7 +792,7 @@ function DocPanel({
           </div>
         ))}
         {actors.length === 0 && (
-          <p className="rounded-lg border border-dashed border-line-strong bg-black/15 px-3 py-2 text-[12px] text-faint">
+          <p className="rounded-lg border border-dashed border-line-strong bg-well px-3 py-2 text-[12px] text-faint">
             No actors.
           </p>
         )}
@@ -775,16 +804,18 @@ function DocPanel({
             Groups
           </span>
           <div className="mt-2 space-y-2">
-            {groups.map((g) => {
+            {groups.map((g, index) => {
               const color = groupColorMap.get(g.id) ?? "#9b9bff";
+              const canonical =
+                g.color ?? STEP_PALETTE[index % STEP_PALETTE.length];
               const next =
                 STEP_PALETTE[
-                  (STEP_PALETTE.indexOf(color) + 1) % STEP_PALETTE.length
+                  (STEP_PALETTE.indexOf(canonical) + 1) % STEP_PALETTE.length
                 ];
               return (
                 <div
                   key={g.id}
-                  className="rounded-lg border border-white/15 bg-black/20 p-2.5 shadow-inner shadow-white/5"
+                  className="theme-inset rounded-lg border border-line p-2.5"
                 >
                   <div className="flex items-center gap-2">
                     <button

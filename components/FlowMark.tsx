@@ -20,10 +20,10 @@ export function FlowMark({
       className={className}
       aria-hidden
     >
-      <rect width="32" height="32" rx="7" fill="#14151c" />
+      <rect width="32" height="32" rx="7" fill="var(--app-panel)" />
       <g
         fill="none"
-        stroke="#9b9bff"
+        stroke="var(--app-accent)"
         strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -32,9 +32,9 @@ export function FlowMark({
         <path d="M16 12 V16 H8 V19" />
         <path d="M16 16 H24 V19" />
       </g>
-      <rect x="11" y="5" width="10" height="7" rx="2.2" fill="#9b9bff" />
-      <rect x="3" y="19" width="10" height="7" rx="2.2" fill="#7fd6c2" />
-      <rect x="19" y="19" width="10" height="7" rx="2.2" fill="#eec27a" />
+      <rect x="11" y="5" width="10" height="7" rx="2.2" fill="var(--app-accent)" />
+      <rect x="3" y="19" width="10" height="7" rx="2.2" fill="var(--app-teal)" />
+      <rect x="19" y="19" width="10" height="7" rx="2.2" fill="var(--app-amber)" />
     </svg>
   );
 }

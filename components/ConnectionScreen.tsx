@@ -104,7 +104,7 @@ export function ConnectionScreen({
 
   return (
     <main className="app-shell flex h-dvh items-center justify-center p-5">
-      <section className="anim-pop material-panel w-full max-w-[720px] rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50">
+      <section className="anim-pop material-panel w-full max-w-[720px] rounded-2xl border border-line-strong p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <FlowMark size={52} className="shrink-0" />
@@ -160,7 +160,7 @@ export function ConnectionScreen({
           className={`mt-5 flex min-h-[150px] flex-col items-center justify-center rounded-xl border border-dashed px-5 text-center transition-colors ${
             over
               ? "border-accent bg-accent/10"
-              : "border-line-strong bg-black/20"
+              : "border-line-strong bg-well"
           }`}
         >
           <Upload size={20} className="text-accent" />

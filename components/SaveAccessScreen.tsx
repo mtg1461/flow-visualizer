@@ -24,7 +24,7 @@ export function SaveAccessScreen({
 
   return (
     <main className="app-shell flex h-dvh items-center justify-center p-5">
-      <section className="anim-pop material-panel w-full max-w-[620px] rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50">
+      <section className="anim-pop material-panel w-full max-w-[620px] rounded-2xl border border-line-strong p-6">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
@@ -60,7 +60,7 @@ export function SaveAccessScreen({
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl border border-white/15 bg-black/20 p-3 shadow-inner shadow-white/5">
+        <div className="theme-inset mt-6 rounded-xl border border-line p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[12.5px] text-mute">
               {preview.views.length} view{preview.views.length === 1 ? "" : "s"} found
@@ -82,7 +82,7 @@ export function SaveAccessScreen({
           type="button"
           onClick={onAllowSave}
           disabled={busy}
-          className="mt-5 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/70 bg-accent px-4 text-[13px] font-semibold text-bg shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-5 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent/70 bg-accent px-4 text-[13px] font-semibold text-on-accent shadow-[0_0_18px_rgba(155,155,255,0.24)] transition-[background-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:bg-accent/90 hover:shadow-[0_0_24px_rgba(155,155,255,0.34)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save size={15} strokeWidth={2.6} />
           Allow saving changes

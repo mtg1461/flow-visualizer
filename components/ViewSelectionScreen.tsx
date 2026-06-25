@@ -58,7 +58,7 @@ export function ViewSelectionScreen({
 
   return (
     <main className="app-shell flex h-dvh items-center justify-center p-5">
-      <section className="anim-pop material-panel w-full max-w-[760px] rounded-2xl border border-white/20 p-6 shadow-2xl shadow-black/50">
+      <section className="anim-pop material-panel w-full max-w-[760px] rounded-2xl border border-line-strong p-6">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
@@ -104,7 +104,7 @@ export function ViewSelectionScreen({
               type="button"
               onClick={choose(view.id)}
               disabled={busy}
-              className={`group min-h-[94px] cursor-pointer rounded-xl border border-line-strong bg-black/20 p-3 text-left shadow-inner shadow-white/5 transition-[border-color,background-color,box-shadow,opacity,transform] duration-150 hover:-translate-y-px hover:border-accent/55 hover:bg-accent/10 hover:shadow-[0_12px_30px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed ${
+              className={`theme-inset group min-h-[94px] cursor-pointer rounded-xl border border-line-strong p-3 text-left transition-[border-color,background-color,box-shadow,opacity,transform] duration-150 hover:-translate-y-px hover:border-accent/55 hover:bg-accent/10 disabled:cursor-not-allowed ${
                 launch?.id === view.id ? "opacity-0" : "opacity-100"
               }`}
             >
@@ -141,7 +141,7 @@ export function ViewSelectionScreen({
       {launch && selected && (
         <div
           aria-hidden
-          className="material-panel fixed z-[60] rounded-xl border border-accent/50 px-3 py-2 text-left shadow-2xl shadow-black/50"
+          className="material-panel fixed z-[60] rounded-xl border border-accent/50 px-3 py-2 text-left"
           style={{
             left: launch.active ? 14 : launch.rect.left,
             top: launch.active ? 8 : launch.rect.top,

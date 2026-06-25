@@ -29,9 +29,9 @@ export function DisconnectDialog({
         type="button"
         aria-label="Cancel disconnect"
         onClick={onCancel}
-        className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
+        className="theme-overlay absolute inset-0 cursor-default backdrop-blur-sm"
       />
-      <div className="anim-pop material-panel relative w-full max-w-[420px] rounded-2xl border border-white/20 p-5 shadow-2xl shadow-black/55">
+      <div className="anim-pop material-panel relative w-full max-w-[420px] rounded-2xl border border-line-strong p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose/30 bg-rose/10 text-rose">
@@ -65,7 +65,7 @@ export function DisconnectDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="h-8 cursor-pointer rounded-lg bg-rose px-4 text-[12.5px] font-medium text-bg transition-opacity hover:opacity-90"
+            className="h-8 cursor-pointer rounded-lg bg-rose px-4 text-[12.5px] font-medium text-on-accent transition-opacity hover:opacity-90"
           >
             Disconnect
           </button>

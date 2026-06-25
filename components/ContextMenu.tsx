@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { Group, Link2, Plus, Trash2, Ungroup } from "lucide-react";
-import { STEP_PALETTE } from "@/lib/meta";
+import { graphPalette } from "@/lib/meta";
+import { useTheme } from "@/hooks/useTheme";
 import type { EdgeRef, Pos } from "@/lib/graph";
 
 export type MenuTarget =
@@ -34,7 +35,7 @@ interface Props {
 }
 
 const itemCls =
-  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] text-mute transition-colors hover:bg-white/10 hover:text-text";
+  "flex w-full cursor-pointer items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] text-mute transition-colors hover:bg-well hover:text-text";
 
 export function ContextMenu({
   menu,
@@ -51,7 +52,9 @@ export function ContextMenu({
   onDeleteStep,
   onDeleteEdge,
 }: Props) {
+  const { resolvedTheme } = useTheme();
   const ref = useRef<HTMLDivElement>(null);
+  const palette = graphPalette(resolvedTheme);
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
@@ -76,7 +79,7 @@ export function ContextMenu({
     <div
       ref={ref}
       role="menu"
-      className="anim-pop material-panel fixed z-50 w-[184px] rounded-xl border border-white/20 py-1.5 shadow-2xl shadow-black/55"
+      className="anim-pop material-panel fixed z-50 w-[184px] rounded-xl border border-line-strong py-1.5"
       style={{ left: x, top: y, animationDuration: "0.12s" }}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -119,20 +122,22 @@ export function ContextMenu({
                 !currentColor ? "ring-1 ring-text/50" : ""
               }`}
             />
-            {STEP_PALETTE.slice(0, 6).map((c) => (
+            {palette.slice(0, 6).map((swatch) => (
               <button
-                key={c}
+                key={swatch.value}
                 type="button"
-                title={c}
-                aria-label={`Color ${c}`}
+                title={swatch.value}
+                aria-label={`Color ${swatch.value}`}
                 onClick={() => {
-                  onColor(target.id, c);
+                  onColor(target.id, swatch.value);
                   onClose();
                 }}
                 className={`size-4 cursor-pointer rounded-full transition-transform hover:scale-110 ${
-                  currentColor === c ? "ring-1 ring-text/70 ring-offset-1 ring-offset-raise" : ""
+                  currentColor === swatch.value
+                    ? "ring-1 ring-text/70 ring-offset-1 ring-offset-raise"
+                    : ""
                 }`}
-                style={{ background: c }}
+                style={{ background: swatch.color }}
               />
             ))}
           </div>
@@ -196,22 +201,22 @@ export function ContextMenu({
             Add step here
           </button>
           <div className="flex items-center gap-1.5 px-3 py-1.5">
-            {STEP_PALETTE.slice(0, 7).map((c) => (
+            {palette.slice(0, 7).map((swatch) => (
               <button
-                key={c}
+                key={swatch.value}
                 type="button"
-                title={c}
-                aria-label={`Group color ${c}`}
+                title={swatch.value}
+                aria-label={`Group color ${swatch.value}`}
                 onClick={() => {
-                  onGroupColor(target.id, c);
+                  onGroupColor(target.id, swatch.value);
                   onClose();
                 }}
                 className={`size-4 cursor-pointer rounded-full transition-transform hover:scale-110 ${
-                  currentColor === c
+                  currentColor === swatch.value
                     ? "ring-1 ring-text/70 ring-offset-1 ring-offset-raise"
                     : ""
                 }`}
-                style={{ background: c }}
+                style={{ background: swatch.color }}
               />
             ))}
           </div>
